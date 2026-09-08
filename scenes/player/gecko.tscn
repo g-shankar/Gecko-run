@@ -30,3 +30,11 @@ mesh = SubResource("CapsuleMesh_gecko")
 
 [node name="CameraMount" type="Node3D" parent="."]
 position = Vector3(0, 1.4, 0)
+
+[node name="WallRayL" type="RayCast3D" parent="."]
+position = Vector3(-0.2, 0.35, 0)
+target_position = Vector3(0, 0, -1.2)
+
+[node name="WallRayR" type="RayCast3D" parent="."]
+position = Vector3(0.2, 0.35, 0)
+target_position = Vector3(0, 0, -1.2)

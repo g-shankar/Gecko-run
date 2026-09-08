@@ -44,8 +44,9 @@ func _process(_delta: float) -> void:
 	var v: Vector3 = _gecko.velocity
 	var speed: float = Vector2(v.x, v.z).length()
 	var dist: float = _start_z - _gecko.global_position.z
-	_label.text = "DEV  %d fps\n%.1f m/s    dist %.1f m\njumps %d    peak %.2f m    steer %+.2f" % [
+	_label.text = "DEV  %d fps    state %s\n%.1f m/s    dist %.1f m\njumps %d    peak %.2f m    steer %+.2f" % [
 		Engine.get_frames_per_second(),
+		_gecko.stat_state,
 		speed,
 		dist,
 		_gecko.stat_jumps,

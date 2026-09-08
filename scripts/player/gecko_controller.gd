@@ -16,7 +16,8 @@ const DebugHUDScript := preload("res://scripts/dev/debug_hud.gd")
 ## PROMPT HISTORY: P2 = run + steer. P3 = jump (+coyote/buffer). P4 = camera.
 ## P4.5 = touch controls (swipe steer, tap jump) for phone playtests.
 ## P4.6 = dev metrics HUD (fps, speed, distance, jump stats).
-## P5-P7 = wall adhesion. P8 = dash. STUNNED/DEAD arrive with hazards (P10+).
+## P5 = wall detection + adhesion (two feeler rays, stick on contact).
+## P6-P7 = wall movement + transitions. P8 = dash. STUNNED/DEAD arrive with hazards (P10+).
 
 ## --- Tuning (spec §7) -------------------------------------------------------
 @export var run_speed: float = 5.0     ## Constant auto-forward speed (m/s).
@@ -29,6 +30,12 @@ const DebugHUDScript := preload("res://scripts/dev/debug_hud.gd")
 @export var touch_steer_pixels: float = 120.0 ## Drag distance (px) for full steer.
 @export var tap_max_time: float = 0.25  ## A press longer than this is not a tap.
 @export var tap_max_dist: float = 24.0  ## Finger travel (px) beyond this is not a tap.
+@export var wall_detect_dist: float = 1.2 ## Ray length: how far ahead walls are "seen".
+@export var wall_latch_dist: float = 0.55 ## Attach when a climbable wall is this close (m).
+@export var adhere_press_speed: float = 2.0 ## Press-into-wall speed while adhered (m/s).
+@export var adhere_grace_time: float = 0.4 ## Time allowed to reach the wall face
+## after latching (s). Must cover wall_latch_dist / adhere_press_speed with
+## margin, or the gecko lets go just before touching.
 
 ## --- State ------------------------------------------------------------------
 ## Full state list from spec §7; only RUN/AIR are used so far.
@@ -54,9 +61,25 @@ var stat_last_peak: float = 0.0
 var stat_steer: float = 0.0
 var _jump_start_y: float = 0.0
 
+## P5 wall adhesion: the surface we're stuck to, a string copy of `state` for
+## the HUD, and a short grace timer so the first contact frames can't
+## detach us before the press velocity closes the last few centimeters.
+var wall_normal: Vector3 = Vector3.UP
+var stat_state: String = "RUN"
+var _adhere_grace: float = 0.0
+
+@onready var _wall_ray_l: RayCast3D = $WallRayL
+@onready var _wall_ray_r: RayCast3D = $WallRayR
+
 
 func _ready() -> void:
 	_ensure_input_actions()
+	# The feeler rays must ignore the gecko's own body, and their length
+	# follows the exported tuning (the .tscn value is only a default).
+	for ray: RayCast3D in [_wall_ray_l, _wall_ray_r]:
+		ray.add_exception(self)
+		ray.target_position = Vector3(0.0, 0.0, -wall_detect_dist)
+	floor_snap_length = 0.15 # A little extra glue for wall adhesion (P5).
 	var hud := DebugHUDScript.new()
 	hud.setup(self)
 	add_child(hud)
@@ -93,12 +116,16 @@ func _physics_process(delta: float) -> void:
 	if _touch_active:
 		_touch_time += delta
 	_update_state()
+	if state == MoveState.RUN or state == MoveState.AIR:
+		_check_wall_adhesion()
 	_update_jump_timers(delta)
 	match state:
 		MoveState.RUN, MoveState.AIR:
 			_apply_run_movement(delta)
+		MoveState.ADHERE_WALL:
+			_apply_adhere_movement(delta)
 		_:
-			pass # ADHERE_*, DASH, STUNNED, DEAD arrive in later prompts.
+			pass # ADHERE_CEILING, DASH, STUNNED, DEAD arrive in later prompts.
 	move_and_slide()
 	# Track jump peak for the dev HUD: highest point above jump start.
 	if stat_jumps > 0 and not is_on_floor():
@@ -106,8 +133,76 @@ func _physics_process(delta: float) -> void:
 
 
 ## is_on_floor() reflects the LAST move_and_slide() call — the standard pattern.
+## ADHERE_* states are sticky: only their own logic (P6/P7) may leave them.
 func _update_state() -> void:
+	if state == MoveState.ADHERE_WALL or state == MoveState.ADHERE_CEILING:
+		return
 	state = MoveState.RUN if is_on_floor() else MoveState.AIR
+	stat_state = MoveState.keys()[state]
+
+
+## P5: scan the two feeler rays for a "climbable" surface. Detection range is
+## wall_detect_dist, but we only LATCH on contact (dist <= wall_latch_dist) —
+## the gecko should touch the wall, not stick to thin air a meter away.
+func _check_wall_adhesion() -> void:
+	var best_normal := Vector3.ZERO
+	var best_dist := wall_latch_dist
+	for ray: RayCast3D in [_wall_ray_l, _wall_ray_r]:
+		if not ray.is_colliding():
+			continue
+		var collider: Object = ray.get_collider()
+		if not (collider is Node and (collider as Node).is_in_group("climbable")):
+			continue
+		var dist: float = ray.get_collision_point().distance_to(ray.global_position)
+		if dist < best_dist:
+			best_dist = dist
+			best_normal = ray.get_collision_normal()
+	if best_normal != Vector3.ZERO:
+		_attach_to_wall(best_normal)
+
+
+## P5: stick to the wall. The CharacterBody3D trick: point `up_direction` at
+## the wall, and the wall itself counts as "floor" — gravity-style snapping
+## then keeps the gecko glued instead of sliding off.
+func _attach_to_wall(normal: Vector3) -> void:
+	state = MoveState.ADHERE_WALL
+	stat_state = "ADHERE_WALL"
+	wall_normal = normal.normalized()
+	up_direction = wall_normal
+	_adhere_grace = adhere_grace_time
+	# Reorient the capsule: local +Y becomes the wall normal (belly to the
+	# wall), local forward (-Z) becomes "up the wall". Build an orthonormal,
+	# right-handed basis: x = y cross z.
+	var fwd: Vector3 = Vector3.UP - wall_normal * Vector3.UP.dot(wall_normal)
+	if fwd.length() < 0.05:
+		# Degenerate case (surface nearly horizontal — ceiling territory, P7):
+		# keep the current heading, projected onto the surface plane.
+		fwd = -global_transform.basis.z
+		fwd = fwd - wall_normal * fwd.dot(wall_normal)
+	fwd = fwd.normalized()
+	var z_axis: Vector3 = -fwd
+	var x_axis: Vector3 = wall_normal.cross(z_axis).normalized()
+	global_transform.basis = Basis(x_axis, wall_normal, z_axis).orthonormalized()
+	velocity = -wall_normal * adhere_press_speed
+
+
+## P5: while adhered, just stick. Press gently into the surface; traveling
+## along it arrives in P6. If the surface ends, let go and fall.
+func _apply_adhere_movement(delta: float) -> void:
+	stat_steer = 0.0
+	_adhere_grace -= delta
+	if _adhere_grace <= 0.0 and not is_on_floor():
+		_detach_from_wall()
+		return
+	velocity = -wall_normal * adhere_press_speed
+
+
+## Any exit from the wall restores world-up so gravity and floor detection
+## behave normally again. (P7 will add the proper push-off jump.)
+func _detach_from_wall() -> void:
+	up_direction = Vector3.UP
+	state = MoveState.AIR
+	stat_state = "AIR"
 
 
 ## Ticks the two forgiveness timers, then fires a jump if a buffered press and
@@ -127,10 +222,15 @@ func _update_jump_timers(delta: float) -> void:
 
 
 func _do_jump() -> void:
+	if state == MoveState.ADHERE_WALL:
+		# P5: jumping while stuck just lets go (world-up jump, then fall).
+		# P7 replaces this with a real push-off-the-wall jump.
+		up_direction = Vector3.UP
 	velocity.y = jump_velocity
 	_buffer_timer = 0.0 # Consume both so one press = one jump.
 	_coyote_timer = 0.0
 	state = MoveState.AIR
+	stat_state = "AIR"
 	stat_jumps += 1
 	_jump_start_y = global_position.y
 	stat_last_peak = 0.0
