@@ -42,6 +42,9 @@ const DebugHUDScript := preload("res://scripts/dev/debug_hud.gd")
 @export var adhere_cooldown: float = 0.35 ## After a wall jump, ignore walls this
 ## long (s) — otherwise a feeler ray catches the same wall mid-arc and
 ## re-sticks instantly.
+@export var dash_speed: float = 12.0 ## Dash velocity (m/s).
+@export var dash_duration: float = 0.18 ## How long a dash lasts (s).
+@export var dash_cooldown_time: float = 1.2 ## Spam prevention (s).
 
 ## --- State ------------------------------------------------------------------
 ## Full state list from spec §7; only RUN/AIR are used so far.
@@ -76,6 +79,9 @@ var _adhere_grace: float = 0.0
 var _adhere_cooldown: float = 0.0 ## P7: grace after a wall jump (no re-stick).
 var _kick_timer: float = 0.0 ## P7: after a wall kick, the shove-off momentum
 ## is preserved briefly instead of being stomped by the auto-run.
+var _dash_timer: float = 0.0 ## P8: time left in the current dash.
+var _dash_cooldown: float = 0.0 ## P8: time until dash is available again.
+var _dash_requested: bool = false ## P8: set by the mobile dash button.
 
 @onready var _wall_ray_l: RayCast3D = $WallRayL
 @onready var _wall_ray_r: RayCast3D = $WallRayR
@@ -128,7 +134,18 @@ func _physics_process(delta: float) -> void:
 		_adhere_cooldown -= delta
 	if _kick_timer > 0.0:
 		_kick_timer -= delta
+	if _dash_cooldown > 0.0:
+		_dash_cooldown -= delta
 	_update_state()
+	# P8: dash on Shift (or the mobile dash button). Only from RUN/AIR, and
+	# the cooldown prevents spam.
+	var dash_pressed: bool = Input.is_action_just_pressed("dash") or _dash_requested
+	_dash_requested = false
+	if dash_pressed and _dash_cooldown <= 0.0 and (state == MoveState.RUN or state == MoveState.AIR):
+		state = MoveState.DASH
+		stat_state = "DASH"
+		_dash_timer = dash_duration
+		_dash_cooldown = dash_cooldown_time
 	if state == MoveState.RUN or state == MoveState.AIR:
 		_check_wall_adhesion()
 	_update_jump_timers(delta)
@@ -137,8 +154,10 @@ func _physics_process(delta: float) -> void:
 			_apply_run_movement(delta)
 		MoveState.ADHERE_WALL:
 			_apply_adhere_movement(delta)
+		MoveState.DASH:
+			_apply_dash_movement(delta)
 		_:
-			pass # ADHERE_CEILING, DASH, STUNNED, DEAD arrive in later prompts.
+			pass # ADHERE_CEILING, STUNNED, DEAD arrive in later prompts.
 	move_and_slide()
 	# Track jump peak for the dev HUD: highest point above jump start.
 	if stat_jumps > 0 and not is_on_floor():
@@ -148,7 +167,7 @@ func _physics_process(delta: float) -> void:
 ## is_on_floor() reflects the LAST move_and_slide() call — the standard pattern.
 ## ADHERE_* states are sticky: only their own logic (P6/P7) may leave them.
 func _update_state() -> void:
-	if state == MoveState.ADHERE_WALL or state == MoveState.ADHERE_CEILING:
+	if state == MoveState.ADHERE_WALL or state == MoveState.ADHERE_CEILING or state == MoveState.DASH:
 		return
 	state = MoveState.RUN if is_on_floor() else MoveState.AIR
 	stat_state = MoveState.keys()[state]
@@ -230,6 +249,27 @@ func _detach_from_wall() -> void:
 	stat_state = "AIR"
 
 
+## P8: the dash. A short horizontal burst at dash_speed; steering is locked
+## during it (commitment feels punchy). Light gravity so air dashes arc.
+func _apply_dash_movement(delta: float) -> void:
+	_dash_timer -= delta
+	var fwd: Vector3 = -global_transform.basis.z
+	fwd.y = 0.0
+	if fwd.length() < 0.01:
+		fwd = Vector3(0.0, 0.0, -1.0)
+	fwd = fwd.normalized()
+	velocity = fwd * dash_speed
+	velocity.y -= gravity * delta * 0.3
+	if _dash_timer <= 0.0:
+		state = MoveState.AIR if not is_on_floor() else MoveState.RUN
+		stat_state = MoveState.keys()[state]
+
+
+## P8: the mobile dash button calls this (keyboard uses the "dash" action).
+func request_dash() -> void:
+	_dash_requested = true
+
+
 ## Ticks the two forgiveness timers, then fires a jump if a buffered press and
 ## a valid jump window overlap. Runs BEFORE movement so the jump velocity is
 ## picked up by _apply_run_movement() in the same frame (no 1-frame delay).
@@ -306,6 +346,7 @@ func _ensure_input_actions() -> void:
 	_add_key_action(&"steer_left", [KEY_A, KEY_LEFT])
 	_add_key_action(&"steer_right", [KEY_D, KEY_RIGHT])
 	_add_key_action(&"jump", [KEY_SPACE])
+	_add_key_action(&"dash", [KEY_SHIFT])
 
 
 func _add_key_action(action: StringName, keys: Array) -> void:

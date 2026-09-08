@@ -36,6 +36,21 @@ func _ready() -> void:
 	_label.add_theme_color_override("font_color", Color(0.85, 1.0, 0.85))
 	panel.add_child(_label)
 	add_child(panel)
+	# P8: mobile dash button (bottom-right thumb zone). Prototype control;
+	# P14 replaces the dev HUD with real touch UI.
+	var dash_btn := Button.new()
+	dash_btn.text = "DASH"
+	dash_btn.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	dash_btn.position = Vector2(-110, -110)
+	dash_btn.custom_minimum_size = Vector2(96, 96)
+	dash_btn.add_theme_font_size_override("font_size", 20)
+	dash_btn.pressed.connect(_on_dash_pressed)
+	add_child(dash_btn)
+
+
+func _on_dash_pressed() -> void:
+	if _gecko != null and _gecko.has_method("request_dash"):
+		_gecko.request_dash()
 
 
 func _process(_delta: float) -> void:

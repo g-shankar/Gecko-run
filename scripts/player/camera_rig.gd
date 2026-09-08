@@ -71,3 +71,8 @@ func _process(delta: float) -> void:
 		- basis.z * look_ahead
 		+ basis.y * look_height)
 	_camera.look_at(aim, _bank_up)
+	# P8: FOV kick on dash (70 -> 82). Eased, so it punches in and relaxes out.
+	var fov_target := 70.0
+	if target.get("stat_state") == "DASH":
+		fov_target = 82.0
+	_camera.fov = lerpf(_camera.fov, fov_target, 1.0 - exp(-10.0 * delta))
