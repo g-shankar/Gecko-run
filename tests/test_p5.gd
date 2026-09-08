@@ -29,10 +29,15 @@ func _run() -> void:
 			settled = true
 			break
 	_check("starts on ground in RUN", settled)
-	# 8 physics-seconds. The wall face sits ~26 m ahead of spawn and the
-	# gecko runs 5 m/s, so contact happens around t=5.1 s.
-	for i in range(480):
+	# Run until the wall grab happens (P6 climbs afterward, so capture the
+	# attach moment itself, not the end of the run).
+	var attached := false
+	for i in range(600):
 		await physics_frame
+		if _gecko.get("state") == 2: # ADHERE_WALL
+			attached = true
+			break
+	_check("adhered to wall (state == ADHERE_WALL)", attached)
 	_report()
 
 
@@ -43,7 +48,6 @@ func _report() -> void:
 	var basis_y: Vector3 = _gecko.global_transform.basis.y
 	var pos: Vector3 = _gecko.global_position
 	# Enum order: RUN=0, AIR=1, ADHERE_WALL=2.
-	_check("adhered to wall (state == ADHERE_WALL)", state == 2)
 	_check("up_direction is the wall normal (0,0,1)",
 			up.distance_to(Vector3(0.0, 0.0, 1.0)) < 0.05)
 	_check("wall_normal recorded", n.distance_to(Vector3(0.0, 0.0, 1.0)) < 0.05)
@@ -51,7 +55,8 @@ func _report() -> void:
 			basis_y.distance_to(Vector3(0.0, 0.0, 1.0)) < 0.05)
 	_check("gecko parked at the wall face (z < -18)", pos.z < -18.0)
 	_check("gecko did not tunnel through (z > -20.5)", pos.z > -20.5)
-	_check("gecko still glued at end of run (no detach flicker)", state == 2)
+	# NOTE: "still glued at end of run" is P6's territory now — the gecko
+	# climbs after attaching, so end-of-run state is covered by test_p6.
 	var failed := 0
 	for c in _checks:
 		print(("PASS " if c[1] else "FAIL ") + c[0])
