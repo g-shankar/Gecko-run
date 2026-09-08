@@ -1,4 +1,7 @@
 extends CharacterBody3D
+
+const DebugHUDScript := preload("res://scripts/dev/debug_hud.gd")
+
 ## Gecko Run — player controller, gray-box prototype.
 ##
 ## LEARNING NOTES (for Gowrishankar):
@@ -12,6 +15,7 @@ extends CharacterBody3D
 ##
 ## PROMPT HISTORY: P2 = run + steer. P3 = jump (+coyote/buffer). P4 = camera.
 ## P4.5 = touch controls (swipe steer, tap jump) for phone playtests.
+## P4.6 = dev metrics HUD (fps, speed, distance, jump stats).
 ## P5-P7 = wall adhesion. P8 = dash. STUNNED/DEAD arrive with hazards (P10+).
 
 ## --- Tuning (spec §7) -------------------------------------------------------
@@ -44,9 +48,18 @@ var _touch_time: float = 0.0
 var _touch_moved: bool = false
 var _touch_steer: float = 0.0
 
+## Playtest stats surfaced on the dev HUD (P4.6) — numbers beat vibes.
+var stat_jumps: int = 0
+var stat_last_peak: float = 0.0
+var stat_steer: float = 0.0
+var _jump_start_y: float = 0.0
+
 
 func _ready() -> void:
 	_ensure_input_actions()
+	var hud := DebugHUDScript.new()
+	hud.setup(self)
+	add_child(hud)
 
 
 ## Touch controls for the phone playtest builds — Subway Surfers grammar:
@@ -87,6 +100,9 @@ func _physics_process(delta: float) -> void:
 		_:
 			pass # ADHERE_*, DASH, STUNNED, DEAD arrive in later prompts.
 	move_and_slide()
+	# Track jump peak for the dev HUD: highest point above jump start.
+	if stat_jumps > 0 and not is_on_floor():
+		stat_last_peak = maxf(stat_last_peak, global_position.y - _jump_start_y)
 
 
 ## is_on_floor() reflects the LAST move_and_slide() call — the standard pattern.
@@ -115,6 +131,9 @@ func _do_jump() -> void:
 	_buffer_timer = 0.0 # Consume both so one press = one jump.
 	_coyote_timer = 0.0
 	state = MoveState.AIR
+	stat_jumps += 1
+	_jump_start_y = global_position.y
+	stat_last_peak = 0.0
 
 
 func _apply_run_movement(delta: float) -> void:
@@ -123,6 +142,7 @@ func _apply_run_movement(delta: float) -> void:
 	#    that easing IS the feel.
 	var steer_input: float = clampf(
 		Input.get_axis("steer_left", "steer_right") + _touch_steer, -1.0, 1.0)
+	stat_steer = steer_input # Surfaced on the dev HUD.
 	var target_lateral: float = steer_input * steer_speed
 	velocity.x = move_toward(velocity.x, target_lateral, steer_accel * delta)
 
