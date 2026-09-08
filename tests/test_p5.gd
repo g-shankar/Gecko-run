@@ -20,6 +20,11 @@ func _run() -> void:
 	var scene: Node = packed.instantiate()
 	root.add_child(scene)
 	_gecko = scene.get_node("Gecko")
+	# Park every hazard: these suites test wall movement, not dodging.
+	for hn in ["FootstepA", "FootstepB", "Bicycle", "BackingCar"]:
+		var hz: Area3D = scene.get_node(hn)
+		hz.set_physics_process(false)
+		hz.position = Vector3(100, 0, 100)
 	# Let _ready() hooks run and the physics settle. The gecko spawns a hair
 	# above the ground, so give it up to a second to land and enter RUN.
 	var settled := false

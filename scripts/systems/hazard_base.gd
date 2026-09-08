@@ -27,6 +27,8 @@ signal phase_changed(new_phase: int)
 @export var active_time: float = 0.3 ## The hit is live this long (s).
 @export var recovery_time: float = 1.0 ## Wind-down before the next cycle (s).
 @export var one_shot: bool = false ## If true, stop after one RECOVERY.
+@export var hits_always: bool = false ## If true, the hitbox is live in every
+## phase (e.g. a parked car is still a car). Otherwise only during ACTIVE.
 
 var phase: int = Phase.IDLE
 var _phase_timer: float = 0.0
@@ -92,15 +94,18 @@ func _tick_phase(_delta: float) -> void:
 
 
 func _on_body_entered(body: Node3D) -> void:
-	if phase == Phase.ACTIVE and body.is_in_group("gecko"):
+	if not body.is_in_group("gecko"):
+		return
+	if hits_always or phase == Phase.ACTIVE:
 		player_hit.emit()
 
 
 func _check_overlaps() -> void:
-	for body in get_overlapping_bodies():
-		if body.is_in_group("gecko"):
-			player_hit.emit()
-			break
+	if hits_always or phase == Phase.ACTIVE:
+		for body in get_overlapping_bodies():
+			if body.is_in_group("gecko"):
+				player_hit.emit()
+				break
 
 
 ## --- Subclass hooks: override these, don't touch the machine above. ---
