@@ -10,8 +10,9 @@ extends CharacterBody3D
 ## - Every tunable number is an @export var, so you can tweak it live in the
 ##   editor Inspector without touching code. (Spec §7: no magic numbers.)
 ##
-## PROMPT HISTORY: P2 = run + steer. P3 = jump (+coyote/buffer). P5-P7 = wall
-## adhesion. P8 = dash. STUNNED/DEAD arrive with hazards (P10+).
+## PROMPT HISTORY: P2 = run + steer. P3 = jump (+coyote/buffer). P4 = camera.
+## P4.5 = touch controls (swipe steer, tap jump) for phone playtests.
+## P5-P7 = wall adhesion. P8 = dash. STUNNED/DEAD arrive with hazards (P10+).
 
 ## --- Tuning (spec §7) -------------------------------------------------------
 @export var run_speed: float = 5.0     ## Constant auto-forward speed (m/s).
@@ -21,6 +22,9 @@ extends CharacterBody3D
 @export var jump_velocity: float = 6.5 ## Takeoff speed (m/s). Peak height = v^2 / 2g.
 @export var coyote_time: float = 0.12  ## Grace period to jump AFTER leaving a ledge.
 @export var jump_buffer: float = 0.12  ## Remembers a press made just BEFORE landing.
+@export var touch_steer_pixels: float = 120.0 ## Drag distance (px) for full steer.
+@export var tap_max_time: float = 0.25  ## A press longer than this is not a tap.
+@export var tap_max_dist: float = 24.0  ## Finger travel (px) beyond this is not a tap.
 
 ## --- State ------------------------------------------------------------------
 ## Full state list from spec §7; only RUN/AIR are used so far.
@@ -33,12 +37,48 @@ var state: MoveState = MoveState.RUN
 var _coyote_timer: float = 0.0
 var _buffer_timer: float = 0.0
 
+## Touch state (P4.5): one active finger drives steering; a quick tap jumps.
+var _touch_active: bool = false
+var _touch_start: Vector2 = Vector2.ZERO
+var _touch_time: float = 0.0
+var _touch_moved: bool = false
+var _touch_steer: float = 0.0
+
 
 func _ready() -> void:
 	_ensure_input_actions()
 
 
+## Touch controls for the phone playtest builds — Subway Surfers grammar:
+## drag horizontally to steer, quick tap to jump. Keyboard still works too.
+func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch:
+		var touch := event as InputEventScreenTouch
+		if touch.pressed:
+			_touch_active = true
+			_touch_start = touch.position
+			_touch_time = 0.0
+			_touch_moved = false
+			_touch_steer = 0.0
+		else:
+			# Finger lifted: quick + barely moved = tap = jump (via the
+			# same buffer the keyboard uses, so coyote/buffer rules apply).
+			if _touch_active and not _touch_moved and _touch_time <= tap_max_time:
+				_buffer_timer = jump_buffer
+			_touch_active = false
+			_touch_steer = 0.0
+	elif event is InputEventScreenDrag:
+		var drag := event as InputEventScreenDrag
+		if _touch_active:
+			var dx: float = drag.position.x - _touch_start.x
+			if absf(dx) > tap_max_dist:
+				_touch_moved = true # It's a drag, not a tap: no jump on release.
+			_touch_steer = clampf(dx / touch_steer_pixels, -1.0, 1.0)
+
+
 func _physics_process(delta: float) -> void:
+	if _touch_active:
+		_touch_time += delta
 	_update_state()
 	_update_jump_timers(delta)
 	match state:
@@ -78,9 +118,11 @@ func _do_jump() -> void:
 
 
 func _apply_run_movement(delta: float) -> void:
-	# 1. Steering: input as -1 (left) .. +1 (right); ease sideways velocity
-	#    toward the target instead of snapping — that easing IS the feel.
-	var steer_input: float = Input.get_axis("steer_left", "steer_right")
+	# 1. Steering: keyboard axis + touch drag, blended and clamped to -1..+1.
+	#    Ease sideways velocity toward the target instead of snapping —
+	#    that easing IS the feel.
+	var steer_input: float = clampf(
+		Input.get_axis("steer_left", "steer_right") + _touch_steer, -1.0, 1.0)
 	var target_lateral: float = steer_input * steer_speed
 	velocity.x = move_toward(velocity.x, target_lateral, steer_accel * delta)
 
