@@ -68,6 +68,9 @@ var _touch_steer: float = 0.0
 var stat_jumps: int = 0
 var stat_last_peak: float = 0.0
 var stat_steer: float = 0.0
+var stat_deaths: int = 0 ## P10: times squashed.
+var _spawn_pos: Vector3 ## P10: where a respawn puts you.
+var _respawn_timer: float = 0.0 ## P10: countdown while DEAD.
 var _jump_start_y: float = 0.0
 
 ## P5 wall adhesion: the surface we're stuck to, a string copy of `state` for
@@ -89,6 +92,7 @@ var _dash_requested: bool = false ## P8: set by the mobile dash button.
 
 func _ready() -> void:
 	_ensure_input_actions()
+	_spawn_pos = global_position
 	# The feeler rays must ignore the gecko's own body, and their length
 	# follows the exported tuning (the .tscn value is only a default).
 	for ray: RayCast3D in [_wall_ray_l, _wall_ray_r]:
@@ -136,6 +140,14 @@ func _physics_process(delta: float) -> void:
 		_kick_timer -= delta
 	if _dash_cooldown > 0.0:
 		_dash_cooldown -= delta
+	# P10: while DEAD, just count down to respawn. No movement, no input.
+	if state == MoveState.DEAD:
+		_respawn_timer -= delta
+		# Squash flat for readable feedback.
+		scale.y = maxf(0.15, scale.y - delta * 5.0)
+		if _respawn_timer <= 0.0:
+			_respawn()
+		return
 	_update_state()
 	# P8: dash on Shift (or the mobile dash button). Only from RUN/AIR, and
 	# the cooldown prevents spam.
@@ -167,7 +179,7 @@ func _physics_process(delta: float) -> void:
 ## is_on_floor() reflects the LAST move_and_slide() call — the standard pattern.
 ## ADHERE_* states are sticky: only their own logic (P6/P7) may leave them.
 func _update_state() -> void:
-	if state == MoveState.ADHERE_WALL or state == MoveState.ADHERE_CEILING or state == MoveState.DASH:
+	if state == MoveState.ADHERE_WALL or state == MoveState.ADHERE_CEILING or state == MoveState.DASH or state == MoveState.DEAD:
 		return
 	state = MoveState.RUN if is_on_floor() else MoveState.AIR
 	stat_state = MoveState.keys()[state]
@@ -263,6 +275,33 @@ func _apply_dash_movement(delta: float) -> void:
 	if _dash_timer <= 0.0:
 		state = MoveState.AIR if not is_on_floor() else MoveState.RUN
 		stat_state = MoveState.keys()[state]
+
+
+## P10: squashed. Freeze, flatten, count it, and come back in under a second.
+## Idempotent: a second hit while already dead is ignored.
+func die() -> void:
+	if state == MoveState.DEAD:
+		return
+	state = MoveState.DEAD
+	stat_state = "DEAD"
+	stat_deaths += 1
+	_respawn_timer = 0.8
+	velocity = Vector3.ZERO
+
+
+## P10: back to the start, upright, running. Death-to-retry stays under a
+## second (spec: the "one more run" feel starts here).
+func _respawn() -> void:
+	global_position = _spawn_pos
+	velocity = Vector3.ZERO
+	up_direction = Vector3.UP
+	_reset_upright_basis()
+	scale = Vector3.ONE
+	state = MoveState.RUN
+	stat_state = "RUN"
+	_adhere_cooldown = 0.0
+	_kick_timer = 0.0
+	_dash_cooldown = 0.0
 
 
 ## P8: the mobile dash button calls this (keyboard uses the "dash" action).

@@ -2,6 +2,7 @@
 
 [ext_resource type="PackedScene" path="res://scenes/player/gecko.tscn" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/player/camera_rig.tscn" id="2"]
+[ext_resource type="Script" path="res://scripts/systems/footstep.gd" id="3"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
 sky_top_color = Color(0.3, 0.52, 0.88, 1)
@@ -112,6 +113,14 @@ shape = SubResource("BoxShape3D_planter")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="PlanterBoxB"]
 mesh = SubResource("BoxMesh_planter")
+
+[node name="FootstepA" type="Area3D" parent="."]
+position = Vector3(0, 0, -6)
+script = ExtResource("3")
+
+[node name="FootstepB" type="Area3D" parent="."]
+position = Vector3(1.5, 0, -13)
+script = ExtResource("3")
 
 [node name="TestWall" type="StaticBody3D" parent="." groups=["climbable"]]
 position = Vector3(0, 2.5, -20)
