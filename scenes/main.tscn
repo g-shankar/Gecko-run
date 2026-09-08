@@ -1,6 +1,7 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player/gecko.tscn" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/player/camera_rig.tscn" id="2"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
 sky_top_color = Color(0.3, 0.52, 0.88, 1)
@@ -77,3 +78,9 @@ mesh = SubResource("BoxMesh_planter")
 
 [node name="Gecko" parent="." instance=ExtResource("1")]
 position = Vector3(0, 0.2, 6)
+
+[node name="CameraRig" parent="." instance=ExtResource("2")]
+# Note: the rig auto-discovers its target via the "gecko" group (see
+# camera_rig.gd). A `target = NodePath("../Gecko")` override does NOT work
+# here -- Godot 4 does not reliably resolve NodePath overrides that point
+# outside an instanced scene -- so it is intentionally left unwired.

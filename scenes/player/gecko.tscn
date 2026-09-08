@@ -15,7 +15,7 @@ material = SubResource("StandardMaterial3D_gecko")
 radius = 0.25
 height = 1.0
 
-[node name="Gecko" type="CharacterBody3D"]
+[node name="Gecko" type="CharacterBody3D" groups=["gecko"]]
 script = ExtResource("1")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
