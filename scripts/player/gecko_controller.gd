@@ -37,6 +37,11 @@ const DebugHUDScript := preload("res://scripts/dev/debug_hud.gd")
 ## after latching (s). Must cover wall_latch_dist / adhere_press_speed with
 ## margin, or the gecko lets go just before touching.
 @export var wall_run_speed: float = 4.2 ## Auto-climb speed along the wall (m/s).
+@export var wall_jump_push: float = 4.5 ## Wall-jump shove AWAY from the surface (m/s).
+@export var wall_jump_up: float = 5.0 ## Wall-jump boost ALONG the surface, upward (m/s).
+@export var adhere_cooldown: float = 0.35 ## After a wall jump, ignore walls this
+## long (s) — otherwise a feeler ray catches the same wall mid-arc and
+## re-sticks instantly.
 
 ## --- State ------------------------------------------------------------------
 ## Full state list from spec §7; only RUN/AIR are used so far.
@@ -68,6 +73,9 @@ var _jump_start_y: float = 0.0
 var wall_normal: Vector3 = Vector3.UP
 var stat_state: String = "RUN"
 var _adhere_grace: float = 0.0
+var _adhere_cooldown: float = 0.0 ## P7: grace after a wall jump (no re-stick).
+var _kick_timer: float = 0.0 ## P7: after a wall kick, the shove-off momentum
+## is preserved briefly instead of being stomped by the auto-run.
 
 @onready var _wall_ray_l: RayCast3D = $WallRayL
 @onready var _wall_ray_r: RayCast3D = $WallRayR
@@ -116,6 +124,10 @@ func _input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
 	if _touch_active:
 		_touch_time += delta
+	if _adhere_cooldown > 0.0:
+		_adhere_cooldown -= delta
+	if _kick_timer > 0.0:
+		_kick_timer -= delta
 	_update_state()
 	if state == MoveState.RUN or state == MoveState.AIR:
 		_check_wall_adhesion()
@@ -146,6 +158,8 @@ func _update_state() -> void:
 ## wall_detect_dist, but we only LATCH on contact (dist <= wall_latch_dist) —
 ## the gecko should touch the wall, not stick to thin air a meter away.
 func _check_wall_adhesion() -> void:
+	if _adhere_cooldown > 0.0:
+		return # P7: just kicked off; don't catch the same wall mid-arc.
 	var best_normal := Vector3.ZERO
 	var best_dist := wall_latch_dist
 	for ray: RayCast3D in [_wall_ray_l, _wall_ray_r]:
@@ -208,9 +222,10 @@ func _apply_adhere_movement(delta: float) -> void:
 
 
 ## Any exit from the wall restores world-up so gravity and floor detection
-## behave normally again. (P7 will add the proper push-off jump.)
+## behave normally again.
 func _detach_from_wall() -> void:
 	up_direction = Vector3.UP
+	_reset_upright_basis()
 	state = MoveState.AIR
 	stat_state = "AIR"
 
@@ -233,10 +248,17 @@ func _update_jump_timers(delta: float) -> void:
 
 func _do_jump() -> void:
 	if state == MoveState.ADHERE_WALL:
-		# P5: jumping while stuck just lets go (world-up jump, then fall).
-		# P7 replaces this with a real push-off-the-wall jump.
+		# P7: the wall kick. Shove away from the surface plus up along it,
+		# then AIR with a restored upright frame. Run -> wall -> climb ->
+		# kick -> land is the core loop.
+		var up_wall: Vector3 = -global_transform.basis.z
+		velocity = wall_normal * wall_jump_push + up_wall * wall_jump_up
+		_reset_upright_basis()
 		up_direction = Vector3.UP
-	velocity.y = jump_velocity
+		_adhere_cooldown = adhere_cooldown
+		_kick_timer = 0.35
+	else:
+		velocity.y = jump_velocity
 	_buffer_timer = 0.0 # Consume both so one press = one jump.
 	_coyote_timer = 0.0
 	state = MoveState.AIR
@@ -244,6 +266,13 @@ func _do_jump() -> void:
 	stat_jumps += 1
 	_jump_start_y = global_position.y
 	stat_last_peak = 0.0
+
+
+## P7: restore the upright running frame (face down-track, head up) after
+## leaving a wall. Without this the gecko keeps its wall-tilted basis and
+## runs sideways through the world.
+func _reset_upright_basis() -> void:
+	global_transform.basis = Basis(Vector3.RIGHT, Vector3.UP, Vector3.BACK).orthonormalized()
 
 
 func _apply_run_movement(delta: float) -> void:
@@ -257,7 +286,12 @@ func _apply_run_movement(delta: float) -> void:
 	velocity.x = move_toward(velocity.x, target_lateral, steer_accel * delta)
 
 	# 2. Auto-forward: constant speed, always -Z. The player never controls this.
-	velocity.z = -run_speed
+	# P7: right after a wall kick the shove-off momentum is preserved and
+	# eased back into the auto-run, so the kick visibly arcs off the wall.
+	if _kick_timer > 0.0:
+		velocity.z = move_toward(velocity.z, -run_speed, 30.0 * delta)
+	else:
+		velocity.z = -run_speed
 
 	# 3. Gravity: keeps the gecko planted; lets it leave the ground when jumping.
 	if not is_on_floor():
