@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player/gecko.tscn" id="1"]
 
@@ -29,6 +29,17 @@ size = Vector2(120, 120)
 
 [sub_resource type="WorldBoundaryShape3D" id="WorldBoundaryShape3D_ground"]
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_planter"]
+size = Vector3(1.2, 0.6, 1.2)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_planter"]
+albedo_color = Color(0.45, 0.3, 0.18, 1)
+roughness = 0.95
+
+[sub_resource type="BoxMesh" id="BoxMesh_planter"]
+material = SubResource("StandardMaterial3D_planter")
+size = Vector3(1.2, 0.6, 1.2)
+
 [node name="Main" type="Node3D"]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
@@ -45,6 +56,24 @@ mesh = SubResource("PlaneMesh_ground")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="GroundBody"]
 shape = SubResource("WorldBoundaryShape3D_ground")
+
+[node name="PlanterBoxA" type="StaticBody3D" parent="."]
+position = Vector3(1.5, 0.3, -6)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PlanterBoxA"]
+shape = SubResource("BoxShape3D_planter")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="PlanterBoxA"]
+mesh = SubResource("BoxMesh_planter")
+
+[node name="PlanterBoxB" type="StaticBody3D" parent="."]
+position = Vector3(-1.2, 0.3, -14)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PlanterBoxB"]
+shape = SubResource("BoxShape3D_planter")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="PlanterBoxB"]
+mesh = SubResource("BoxMesh_planter")
 
 [node name="Gecko" parent="." instance=ExtResource("1")]
 position = Vector3(0, 0.2, 6)

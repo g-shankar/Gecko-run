@@ -18,11 +18,20 @@ extends CharacterBody3D
 @export var steer_speed: float = 3.2   ## Top sideways speed (m/s).
 @export var steer_accel: float = 18.0  ## How snappy steering feels (m/s^2).
 @export var gravity: float = 22.0      ## Snappier than Earth's 9.8: arcade feel.
+@export var jump_velocity: float = 6.5 ## Takeoff speed (m/s). Peak height = v^2 / 2g.
+@export var coyote_time: float = 0.12  ## Grace period to jump AFTER leaving a ledge.
+@export var jump_buffer: float = 0.12  ## Remembers a press made just BEFORE landing.
 
 ## --- State ------------------------------------------------------------------
 ## Full state list from spec §7; only RUN/AIR are used so far.
 enum MoveState { RUN, AIR, ADHERE_WALL, ADHERE_CEILING, DASH, STUNNED, DEAD }
 var state: MoveState = MoveState.RUN
+
+## Jump-forgiveness timers (spec §7). They make the game feel fair:
+## - coyote: "I pressed jump a blink after running off the edge — it still worked."
+## - buffer: "I pressed jump a blink before landing — it still worked."
+var _coyote_timer: float = 0.0
+var _buffer_timer: float = 0.0
 
 
 func _ready() -> void:
@@ -31,6 +40,7 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	_update_state()
+	_update_jump_timers(delta)
 	match state:
 		MoveState.RUN, MoveState.AIR:
 			_apply_run_movement(delta)
@@ -42,6 +52,29 @@ func _physics_process(delta: float) -> void:
 ## is_on_floor() reflects the LAST move_and_slide() call — the standard pattern.
 func _update_state() -> void:
 	state = MoveState.RUN if is_on_floor() else MoveState.AIR
+
+
+## Ticks the two forgiveness timers, then fires a jump if a buffered press and
+## a valid jump window overlap. Runs BEFORE movement so the jump velocity is
+## picked up by _apply_run_movement() in the same frame (no 1-frame delay).
+func _update_jump_timers(delta: float) -> void:
+	if is_on_floor():
+		_coyote_timer = coyote_time
+	else:
+		_coyote_timer -= delta
+	if Input.is_action_just_pressed("jump"):
+		_buffer_timer = jump_buffer
+	else:
+		_buffer_timer -= delta
+	if _buffer_timer > 0.0 and _coyote_timer > 0.0:
+		_do_jump()
+
+
+func _do_jump() -> void:
+	velocity.y = jump_velocity
+	_buffer_timer = 0.0 # Consume both so one press = one jump.
+	_coyote_timer = 0.0
+	state = MoveState.AIR
 
 
 func _apply_run_movement(delta: float) -> void:
@@ -66,6 +99,7 @@ func _apply_run_movement(delta: float) -> void:
 func _ensure_input_actions() -> void:
 	_add_key_action(&"steer_left", [KEY_A, KEY_LEFT])
 	_add_key_action(&"steer_right", [KEY_D, KEY_RIGHT])
+	_add_key_action(&"jump", [KEY_SPACE])
 
 
 func _add_key_action(action: StringName, keys: Array) -> void:
