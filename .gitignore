@@ -1,0 +1,14 @@
+# Godot 4 generated files
+.godot/
+
+# Export builds
+exports/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor temp files
+*.tmp
+*.orig
