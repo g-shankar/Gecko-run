@@ -36,6 +36,7 @@ const DebugHUDScript := preload("res://scripts/dev/debug_hud.gd")
 @export var adhere_grace_time: float = 0.4 ## Time allowed to reach the wall face
 ## after latching (s). Must cover wall_latch_dist / adhere_press_speed with
 ## margin, or the gecko lets go just before touching.
+@export var wall_run_speed: float = 4.2 ## Auto-climb speed along the wall (m/s).
 
 ## --- State ------------------------------------------------------------------
 ## Full state list from spec §7; only RUN/AIR are used so far.
@@ -186,15 +187,24 @@ func _attach_to_wall(normal: Vector3) -> void:
 	velocity = -wall_normal * adhere_press_speed
 
 
-## P5: while adhered, just stick. Press gently into the surface; traveling
-## along it arrives in P6. If the surface ends, let go and fall.
+## P5: while adhered, just stick. P6: remap controls to the wall — "forward"
+## (auto) climbs the surface, steering moves across it. A gentle press into
+## the surface keeps it counting as floor. If the surface ends, let go.
 func _apply_adhere_movement(delta: float) -> void:
-	stat_steer = 0.0
 	_adhere_grace -= delta
 	if _adhere_grace <= 0.0 and not is_on_floor():
 		_detach_from_wall()
 		return
-	velocity = -wall_normal * adhere_press_speed
+	# Wall frame from the attach-time basis: local -Z runs up the surface,
+	# local X runs across it, local +Y is the wall normal (belly-to-wall).
+	var up_wall: Vector3 = -global_transform.basis.z
+	var across: Vector3 = global_transform.basis.x
+	var steer_input: float = clampf(
+		Input.get_axis("steer_left", "steer_right") + _touch_steer, -1.0, 1.0)
+	stat_steer = steer_input # Surfaced on the dev HUD.
+	velocity = (up_wall * wall_run_speed
+		+ across * steer_input * steer_speed
+		- wall_normal * adhere_press_speed)
 
 
 ## Any exit from the wall restores world-up so gravity and floor detection

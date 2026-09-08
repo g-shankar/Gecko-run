@@ -20,9 +20,15 @@ extends Node3D
 @export var look_ahead: float = 2.0   ## Aim point this far ahead of the gecko (m).
 @export var look_height: float = 0.5  ## Aim point height above the gecko (m).
 @export var arm_margin: float = 0.25  ## SpringArm safety margin (m).
+@export var bank_speed: float = 6.0 ## How fast the camera rolls when the gecko
+                                 ## adheres to a wall (higher = snappier).
 
 @onready var _boom: SpringArm3D = $Boom
 @onready var _camera: Camera3D = $Boom/Camera3D
+
+## P6: the camera's smoothed up-vector. Normally world-up; rolls toward the
+## wall normal while the gecko is adhered so the wall reads as "ground".
+var _bank_up := Vector3.UP
 
 
 func _ready() -> void:
@@ -47,10 +53,21 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if target == null:
 		return
-	# Glide toward the follow point. The exponential blend (1 - e^-kt) is
-	# framerate-independent: same feel at 30 fps and 120 fps.
-	var desired: Vector3 = target.global_position + Vector3(0.0, follow_height, 0.0)
+	# P6: roll the camera's up-vector toward the gecko's up_direction. On the
+	# floor that's world-up (no visible change); on a wall it becomes the wall
+	# normal, so the wall reads as ground. Exponential blend = no snap.
+	var up_target := Vector3.UP
+	if target is CharacterBody3D:
+		up_target = (target as CharacterBody3D).up_direction
+	_bank_up = _bank_up.lerp(up_target, 1.0 - exp(-bank_speed * delta)).normalized()
+	# Glide toward the follow point, measured along the (possibly banked) up.
+	var desired: Vector3 = target.global_position + _bank_up * follow_height
 	var blend: float = 1.0 - exp(-follow_speed * delta)
 	global_position = global_position.lerp(desired, blend)
-	# Aim slightly down-track so the player sees what's coming, not just the tail.
-	_camera.look_at(target.global_position + Vector3(0.0, look_height, -look_ahead))
+	# Aim along the gecko's own frame: forward = -basis.z, up = basis.y. On
+	# the floor that's down-track; on a wall that's up the surface.
+	var basis: Basis = target.global_transform.basis
+	var aim: Vector3 = (target.global_position
+		- basis.z * look_ahead
+		+ basis.y * look_height)
+	_camera.look_at(aim, _bank_up)
