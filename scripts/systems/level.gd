@@ -9,6 +9,7 @@ class_name Level
 
 const HAZARD_SCRIPTS := {
 	"shield": "res://scripts/systems/shield_pickup.gd",
+	"speed": "res://scripts/systems/speed_pickup.gd",
 	"footstep": "res://scripts/systems/footstep.gd",
 	"bicycle": "res://scripts/systems/bicycle.gd",
 	"bird": "res://scripts/systems/bird.gd",
@@ -19,6 +20,7 @@ const HAZARD_SCRIPTS := {
 
 const HAZARD_NAMES := {
 	"shield": "ShieldPickup",
+	"speed": "SpeedPickup",
 	"footstep": "Footstep", # + A/B/C per instance.
 	"bicycle": "Bicycle",
 	"bird": "Bird",

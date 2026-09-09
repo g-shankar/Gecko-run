@@ -75,4 +75,6 @@ func _process(delta: float) -> void:
 	var fov_target := 70.0
 	if target.get("stat_state") == "DASH":
 		fov_target = 82.0
+	elif float(target.get("_speed_boost_timer") or 0.0) > 0.0:
+		fov_target = 78.0 ## P19: milder kick for the speed boost.
 	_camera.fov = lerpf(_camera.fov, fov_target, 1.0 - exp(-10.0 * delta))

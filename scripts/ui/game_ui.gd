@@ -29,6 +29,7 @@ var _combo_label: Label ## P17: "COMBO x3" indicator.
 var _mission_label: Label ## P18: mission tracker ("BUGS 7/15").
 var _mission_popup_label: Label ## P18: "MISSION COMPLETE!" popup.
 var _mission_popup_timer: float = 0.0
+var _speed_label: Label ## P19: "SPEED!" indicator while boosted.
 var _final_score_label: Label
 var _best_label: Label
 
@@ -102,6 +103,8 @@ func _process(delta: float) -> void:
 	var gecko := get_tree().get_first_node_in_group("gecko")
 	if gecko != null:
 		_shield_label.visible = int(gecko.get("shield_charges")) > 0
+		# P19: speed indicator follows the boost timer.
+		_speed_label.visible = float(gecko.get("_speed_boost_timer") or 0.0) > 0.0
 	_update_mission_tracker() ## P18.
 	# P15: near-miss popup fades out.
 	if _near_miss_timer > 0.0:
@@ -247,6 +250,13 @@ func _build_hud() -> void:
 	_mission_popup_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_mission_popup_label.visible = false
 	_hud.add_child(_mission_popup_label)
+	# P19: speed indicator, top-left below the mission tracker.
+	_speed_label = _make_label("SPEED!", 28)
+	_speed_label.add_theme_color_override("font_color", Color(1.0, 0.6, 0.15))
+	_speed_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_speed_label.position = Vector2(20, 184)
+	_speed_label.visible = false
+	_hud.add_child(_speed_label)
 
 
 func _on_pause_pressed() -> void:
