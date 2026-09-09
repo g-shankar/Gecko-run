@@ -16,6 +16,16 @@ func _run() -> void:
 	var packed: PackedScene = load("res://scenes/main.tscn")
 	var scene: Node = packed.instantiate()
 	root.add_child(scene)
+	# P14: the GameState autoload starts in READY (start screen). Tests
+	# bypass it: wait a beat for it to load, then remove it so the gecko
+	# runs immediately (gs==null means "just run").
+	for _i in 10:
+		await process_frame
+		if root.has_node("GameState"):
+			break
+	var _gs: Node = root.get_node_or_null("GameState")
+	if _gs != null:
+		_gs.queue_free()
 	_gecko = scene.get_node("Gecko")
 	# Park every hazard: these suites test wall movement, not dodging.
 	for hn in ["FootstepA", "FootstepB", "Bicycle", "BackingCar"]:
