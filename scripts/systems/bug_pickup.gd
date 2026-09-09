@@ -36,17 +36,19 @@ func _build() -> void:
 	zone_shape.radius = 0.6
 	zone.shape = zone_shape
 	add_child(zone)
-	# The bug: a small emissive sphere (firefly).
+	# The bug: a small golden coin (P29: was an emissive sphere — it read
+	# as a placeholder yellow ball in screenshots). Flattened and spinning
+	# on Y, it catches the sun like a coin. Hit zone is untouched.
 	_mesh = MeshInstance3D.new()
 	var bug_mesh := SphereMesh.new()
-	bug_mesh.radius = 0.11 ## P28.5+: was 0.18 — read as giant eggs, not bugs.
-	bug_mesh.height = 0.22
+	bug_mesh.radius = 0.11
+	bug_mesh.height = 0.055 ## P29: flat disc — a coin, not a ball.
 	_mesh.mesh = bug_mesh
 	_glow_mat = StandardMaterial3D.new()
 	_glow_mat.albedo_color = Color(1.0, 0.85, 0.2, 1.0) # Golden.
 	_glow_mat.emission_enabled = true
 	_glow_mat.emission = Color(1.0, 0.75, 0.15, 1.0)
-	_glow_mat.emission_energy_multiplier = 1.4 ## P28.5+: was 2.0, still pops.
+	_glow_mat.emission_energy_multiplier = 1.1 ## P29: was 1.4 — less blobby.
 	_mesh.material_override = _glow_mat
 	add_child(_mesh)
 	# Wings: two tiny translucent planes.

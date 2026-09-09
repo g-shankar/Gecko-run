@@ -34,6 +34,11 @@ func _ready() -> void:
 	_paint_fence()
 	_paint_planters()
 	paint_pergola()
+	_plant_trees() ## P29: background oaks for depth.
+	_paint_clouds() ## P29: billboard clouds — the sky was empty.
+	_paint_wet_driveway() ## P29: the key art's wet reflective driveway.
+	_paint_lawn_patches() ## P29: large tone patches — kills the "green mat".
+	_plant_palm_hibiscus() ## P29: Tripo palm + hibiscus along the edges.
 
 
 ## P28.5+: keep the short dirt segment under the gecko. It only spans
@@ -200,14 +205,59 @@ func _scatter_ground_detail() -> void:
 
 
 ## P28.5+ (art-direction fold-in): the reference is LUSH — every inch dressed.
-## Four more instanced systems along the route edges, one draw call each:
-## layered shrubs at multiple heights, bright flowers, fallen leaves, mulch.
-## Reuses the leaf/soil materials; per-instance tint for variety. Shadows off.
+## P29: the flat route-edge shrub quads are replaced by REAL instanced Tripo
+## bushes (round + tall hedge variants) — actual 3D foliage, one draw call
+## per variant. Falls back to the old quads if a GLB is missing.
 func _dress_route_edges() -> void:
 	_rng.seed = 20260910
 	var parent := get_parent()
-	# Shrubs: single quads with the leaf-cluster texture, random yaw, heights
-	# 0.4-1.7 m — a ragged layered wall of green both sides of the track.
+	_dress_bushes(parent)
+	_dress_flowers(parent)
+	_dress_litter(parent)
+	_dress_mulch(parent)
+
+
+## P29: real 3D bushes. Two variants alternate along both route edges;
+## heights 0.5-1.8 m, a ragged layered wall of actual foliage.
+## P29: real 3D bushes — a ragged layered wall of actual foliage along both
+## route edges. Instance split favors the lighter hedge (bush_tall, 4k
+## verts: 80) over the heavier round shrub (bush_round, 13.5k verts: 40).
+func _dress_bushes(parent: Node) -> void:
+	var variants := ["bush_tall", "bush_round"]
+	var counts := [80, 40]
+	var built := 0
+	for vi in variants.size():
+		var merged := ModelSwap.merge_model_mesh(variants[vi], 60000)
+		if merged == null:
+			continue
+		var count: int = counts[vi]
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.use_colors = true
+		mm.mesh = merged
+		mm.instance_count = count
+		for i in count:
+			var side := 1.0 if (i + vi) % 2 == 0 else -1.0
+			var bscale := _rng.randf_range(0.8, 1.9)
+			var t := Transform3D(
+				Basis(Vector3.UP, _rng.randf() * TAU).scaled(Vector3(bscale, bscale, bscale)),
+				Vector3(side * _rng.randf_range(3.0, 9.0), 0.0,
+					_rng.randf_range(-488.0, 60.0)))
+			mm.set_instance_transform(i, t)
+			var tint := _rng.randf_range(0.75, 1.1)
+			mm.set_instance_color(i, Color(tint, tint, tint))
+		var inst := MultiMeshInstance3D.new()
+		inst.name = "RouteEdgeBush%d" % vi
+		inst.multimesh = mm
+		inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		parent.call_deferred("add_child", inst)
+		built += 1
+	if built == 0:
+		_dress_shrub_quad_fallback(parent)
+
+
+## P29 fallback: the old flat leaf quads if the bush GLBs are missing.
+func _dress_shrub_quad_fallback(parent: Node) -> void:
 	var leaf_mat := StandardMaterial3D.new()
 	leaf_mat.albedo_texture = _make_leaf_texture()
 	leaf_mat.roughness = 0.9
@@ -238,7 +288,39 @@ func _dress_route_edges() -> void:
 	shrubs.multimesh = shrub_mm
 	shrubs.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.call_deferred("add_child", shrubs)
-	# Flowers: small blossom quads, per-instance petal color.
+
+
+## P29: real 3D flower clusters (Tripo) along the route edges; falls back
+## to the painted blossom quads if the GLB is missing.
+func _dress_flowers(parent: Node) -> void:
+	var merged := ModelSwap.merge_model_mesh("flowers", 40000)
+	if merged == null:
+		_dress_flower_quad_fallback(parent)
+		return
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.mesh = merged
+	mm.instance_count = FLOWER_COUNT
+	for i in FLOWER_COUNT:
+		var side := 1.0 if i % 2 == 0 else -1.0
+		var s := _rng.randf_range(0.5, 1.0)
+		var t := Transform3D(
+			Basis(Vector3.UP, _rng.randf() * TAU).scaled(Vector3(s, s, s)),
+			Vector3(side * _rng.randf_range(2.0, 7.0), 0.0,
+				_rng.randf_range(-488.0, 60.0)))
+		mm.set_instance_transform(i, t)
+		var tint := _rng.randf_range(0.85, 1.15)
+		mm.set_instance_color(i, Color(tint, tint, tint))
+	var inst := MultiMeshInstance3D.new()
+	inst.name = "RouteEdgeFlowers"
+	inst.multimesh = mm
+	inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.call_deferred("add_child", inst)
+
+
+## P29 fallback: the painted blossom quads.
+func _dress_flower_quad_fallback(parent: Node) -> void:
 	var flower_mat := StandardMaterial3D.new()
 	flower_mat.albedo_texture = _make_flower_texture()
 	flower_mat.roughness = 0.8
@@ -269,7 +351,10 @@ func _dress_route_edges() -> void:
 	flowers.multimesh = flower_mm
 	flowers.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.call_deferred("add_child", flowers)
-	# Fallen leaves: flat quads on the lawn, autumn browns/oranges.
+
+
+## Fallen leaves: flat quads on the lawn, autumn browns/oranges.
+func _dress_litter(parent: Node) -> void:
 	var leaf_lit_mat := StandardMaterial3D.new()
 	leaf_lit_mat.albedo_texture = _make_clover_texture()
 	leaf_lit_mat.roughness = 1.0
@@ -300,7 +385,10 @@ func _dress_route_edges() -> void:
 	litter.multimesh = flat_mm
 	litter.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.call_deferred("add_child", litter)
-	# Mulch: dark soil patches breaking the lawn's green.
+
+
+## Mulch: dark soil patches breaking the lawn's green.
+func _dress_mulch(parent: Node) -> void:
 	var mulch_mat := StandardMaterial3D.new()
 	mulch_mat.albedo_texture = _make_soil_texture()
 	mulch_mat.roughness = 1.0
@@ -473,6 +561,83 @@ func _make_plant(mat: Material) -> Node3D:
 		q.rotation.y = r * PI / 2.0
 		p.add_child(q)
 	return p
+
+
+## P29: three big Florida oaks at the yard's edges — background depth so
+## the horizon isn't an empty gradient. Individual placements (not a
+## MultiMesh): three draw calls, real models via ModelSwap.
+func _plant_trees() -> void:
+	var parent := get_parent()
+	var spots := [
+		Vector3(-14.0, 0.0, -120.0), Vector3(16.0, 0.0, -260.0),
+		Vector3(-17.0, 0.0, -400.0),
+	]
+	for i in spots.size():
+		var tree := ModelSwap.make_visual("tree", 9.0)
+		if tree == null:
+			continue
+		tree.name = "Oak%d" % (i + 1)
+		tree.position = spots[i]
+		tree.rotation.y = _rng.randf() * TAU
+		parent.call_deferred("add_child", tree)
+
+
+## P29: soft billboard clouds drifting nowhere (static — scope control),
+## one shared material, six quads high above the route. The flat blue sky
+## was the other half of the "flat world" complaint.
+func _paint_clouds() -> void:
+	var parent := get_parent()
+	var cloud_tex := _make_cloud_texture()
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = cloud_tex
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	mat.albedo_color = Color(1.0, 1.0, 1.0, 0.92)
+	var spots: Array[Vector4] = [
+		Vector4(-40.0, 42.0, -140.0, 34.0), Vector4(30.0, 50.0, -220.0, 44.0),
+		Vector4(-25.0, 38.0, -320.0, 28.0), Vector4(45.0, 46.0, -80.0, 30.0),
+		Vector4(5.0, 55.0, -420.0, 52.0), Vector4(-50.0, 44.0, -40.0, 26.0),
+	]
+	for i in spots.size():
+		var q := MeshInstance3D.new()
+		q.name = "Cloud%d" % (i + 1)
+		var qm := QuadMesh.new()
+		var w: float = spots[i].w
+		qm.size = Vector2(w, w * 0.45)
+		qm.material = mat
+		q.mesh = qm
+		q.position = Vector3(spots[i].x, spots[i].y, spots[i].z)
+		q.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		parent.call_deferred("add_child", q)
+
+
+## A soft multi-lobed cloud puff on transparency.
+func _make_cloud_texture() -> ImageTexture:
+	var n := 128
+	var img := Image.create(n, n, true, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var lobes := [
+		[0.35, 0.55, 0.22], [0.5, 0.48, 0.28], [0.65, 0.55, 0.22],
+		[0.45, 0.62, 0.20], [0.58, 0.62, 0.18],
+	]
+	for y in n:
+		for x in n:
+			var u := float(x) / n
+			var v := float(y) / n
+			var d := 1.0
+			for lobe in lobes:
+				var la: Array = lobe
+				var dx := (u - float(la[0])) / float(la[2])
+				var dy := (v - float(la[1])) / (float(la[2]) * 0.62)
+				d = minf(d, sqrt(dx * dx + dy * dy))
+			if d < 1.0:
+				var edge := _hash(x, y, 211)
+				var a := clampf((1.0 - d) * 1.6 - edge * 0.25, 0.0, 1.0)
+				var shade := 0.92 + (1.0 - d) * 0.08
+				img.set_pixel(x, y, Color(shade, shade, shade, a))
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
 
 
 ## The P20 pergola keeps its climbable boxes; they just look like wood now.
@@ -753,3 +918,253 @@ func _sample_grid(grid: PackedFloat32Array, gw: int, fx: float, fy: float) -> fl
 	var c: float = grid[y1 * gw + x0]
 	var d: float = grid[y1 * gw + x1]
 	return a + (b - a) * tx + (c - a) * ty + (a - b - c + d) * tx * ty
+
+
+# ------------------------------------------------- P29: wet driveway ----
+
+## P29: the key art's WET REFLECTIVE DRIVEWAY. A stretch of Backyard Dash
+## (z -40..-110, before the first dog) becomes dark wet concrete: low
+## roughness + high specular so the low sun glints off it, plus glossy
+## PUDDLE PATCHES whose baked sky-gradient fakes the mirror reflection
+## (GL Compatibility has no real reflection probes — the gradient + sun
+## glint reads as "wet" at a glance). VISUALS ONLY: no collision, no
+## gameplay touch. Backyard Dash only — Fence Line never gets this node.
+const WET_Z_MIN := -110.0
+const WET_Z_MAX := -40.0
+const PUDDLE_COUNT := 10
+
+
+func _on_backyard_dash() -> bool:
+	var gs := get_tree().root.get_node_or_null("GameState")
+	if gs == null:
+		return true ## Unit test / capture: default map is the backyard.
+	return String(gs.get("current_map_id")) == "florida_backyard"
+
+
+## P29: route swaps reuse the same BackyardArt node — show the wet driveway
+## only on Backyard Dash, never on Fence Line.
+func refresh_driveway_for_map() -> void:
+	var wet := get_parent().get_node_or_null("WetDriveway")
+	if wet != null:
+		wet.visible = _on_backyard_dash()
+
+
+func _paint_wet_driveway() -> void:
+	if not _on_backyard_dash():
+		return
+	_rng.seed = 20260912
+	var parent := get_parent()
+	var wrap := Node3D.new()
+	wrap.name = "WetDriveway"
+	# The slab: dark wet concrete, glossy.
+	var slab := MeshInstance3D.new()
+	slab.name = "DrivewaySlab"
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(14.0, WET_Z_MAX - WET_Z_MIN)
+	slab.mesh = pm
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = _make_wet_concrete_texture()
+	mat.roughness = 0.12 ## P29: glossy wet look.
+	mat.metallic = 0.0
+	## P29: Godot 4 has no specular property; the low roughness plus the
+	## bright sky ambient gives the sun glint on the wet concrete.
+	mat.uv1_scale = Vector3(2, 10, 1) # ~7 m tiles.
+	slab.material_override = mat
+	# P29: above the dirt path (y 0.025) — the driveway wins where they cross.
+	slab.position = Vector3(0, 0.045, (WET_Z_MIN + WET_Z_MAX) / 2.0)
+	slab.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	wrap.add_child(slab)
+	# Puddles: near-mirror discs with a baked sky gradient.
+	var pud_mat := StandardMaterial3D.new()
+	pud_mat.albedo_texture = _make_puddle_texture()
+	pud_mat.roughness = 0.05 ## P29: near-mirror.
+	pud_mat.metallic = 0.0
+	## P29: Godot 4 has no specular property; near-zero roughness plus the
+	## baked sky gradient IS the reflection — it reads as mirror at a glance.
+	pud_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	for i in PUDDLE_COUNT:
+		var pd := MeshInstance3D.new()
+		pd.name = "Puddle%d" % (i + 1)
+		var qm := PlaneMesh.new()
+		var w := _rng.randf_range(1.5, 4.2)
+		qm.size = Vector2(w * _rng.randf_range(1.0, 1.7), w)
+		pd.mesh = qm
+		pd.material_override = pud_mat
+		pd.position = Vector3(_rng.randf_range(-6.0, 6.0), 0.06,
+			_rng.randf_range(WET_Z_MIN + 3.0, WET_Z_MAX - 3.0))
+		pd.rotation.y = _rng.randf() * TAU
+		pd.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		wrap.add_child(pd)
+	parent.call_deferred("add_child", wrap)
+
+
+## Dark wet concrete: near-black blue-gray noise, expansion-joint lines,
+## and damp sheen variation. Tileable via the shared value-noise helpers.
+func _make_wet_concrete_texture() -> ImageTexture:
+	var n := 256
+	var img := Image.create(n, n, false, Image.FORMAT_RGB8)
+	for y in n:
+		for x in n:
+			var mottle := _pvnoise(x / 34.0, y / 34.0, 311, 8, 8)
+			var grain := _hash(x, y, 317)
+			var v := 0.62 + (mottle - 0.5) * 0.55 + (grain - 0.5) * 0.22
+			var c := Color(0.135 * v, 0.15 * v, 0.175 * v)
+			# Expansion joints: dark lines every 64 px.
+			if x % 64 < 2 or y % 64 < 2:
+				c *= 0.55
+			img.set_pixel(x, y, c)
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
+
+
+## Puddle: an irregular blob whose albedo is a vertical sky gradient —
+## pale blue at the top fading to dark water at the bottom. That gradient
+## IS the fake mirror: at gecko height it reads as reflected sky, and the
+## 0.05 roughness lets the low sun streak across it for real.
+func _make_puddle_texture() -> ImageTexture:
+	var n := 128
+	var img := Image.create(n, n, true, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var cx := n / 2.0
+	var cy := n / 2.0
+	for y in n:
+		for x in n:
+			var dx := (x - cx) / cx
+			var dy := (y - cy) / cy
+			var r := sqrt(dx * dx + dy * dy)
+			# Wobble the rim so it never reads as a perfect disc.
+			var wob := 1.0 + (_pvnoise(x / 22.0, y / 22.0, 331, 6, 6) - 0.5) * 0.55
+			var d := r / wob
+			if d >= 1.0:
+				continue
+			var edge := clampf((1.0 - d) * 3.0, 0.0, 1.0) # Feathered rim.
+			var sky := 1.0 - float(y) / n # 1 at texture top = sky.
+			var c := Color(
+				lerpf(0.07, 0.52, sky * sky),
+				lerpf(0.09, 0.63, sky * sky),
+				lerpf(0.12, 0.78, sky * sky))
+			img.set_pixel(x, y, Color(c.r, c.g, c.b, edge))
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
+
+
+# -------------------------------------------- P29: lawn tone patches ----
+
+## P29: the honest P28 complaint — the lawn reads as a flat green "mat"
+## with visible 8 m tiling. These 26 large (5-12 m) soft-edged tone patches
+## sit just above the grass (y=0.015) and break the repetition with olive,
+## deep-green, and sun-dried yellow variation. One MultiMesh, one draw call.
+const LAWN_PATCH_COUNT := 26
+
+
+func _paint_lawn_patches() -> void:
+	_rng.seed = 20260913
+	var parent := get_parent()
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = _make_soft_blob_texture()
+	mat.roughness = 1.0
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	var quad := QuadMesh.new()
+	quad.size = Vector2(1, 1)
+	quad.material = mat
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.mesh = quad
+	mm.instance_count = LAWN_PATCH_COUNT
+	var tones := [
+		Color(0.16, 0.34, 0.12), Color(0.42, 0.48, 0.16),
+		Color(0.52, 0.52, 0.22), Color(0.20, 0.40, 0.14),
+	]
+	for i in LAWN_PATCH_COUNT:
+		var flat := Basis(Vector3.UP, _rng.randf() * TAU) \
+			* Basis(Vector3.RIGHT, -PI / 2.0)
+		var s := _rng.randf_range(5.0, 12.0)
+		var t := Transform3D(flat.scaled(Vector3(s, s, s)),
+			Vector3(_rng.randf_range(-14.0, 14.0), 0.015,
+				_rng.randf_range(-400.0, 20.0)))
+		mm.set_instance_transform(i, t)
+		var tone: Color = tones[i % tones.size()]
+		mm.set_instance_color(i,
+			Color(tone.r, tone.g, tone.b, _rng.randf_range(0.18, 0.30)))
+	var patches := MultiMeshInstance3D.new()
+	patches.name = "LawnPatches"
+	patches.multimesh = mm
+	patches.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.call_deferred("add_child", patches)
+
+
+## Soft radial blob on transparency — shared by lawn patches.
+func _make_soft_blob_texture() -> ImageTexture:
+	var n := 64
+	var img := Image.create(n, n, true, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	for y in n:
+		for x in n:
+			var dx := (float(x) / n - 0.5) * 2.0
+			var dy := (float(y) / n - 0.5) * 2.0
+			var d := sqrt(dx * dx + dy * dy)
+			var a := clampf(1.0 - d, 0.0, 1.0)
+			a = a * a * (3.0 - 2.0 * a) # Smoothstep falloff.
+			img.set_pixel(x, y, Color(1, 1, 1, a * 0.9))
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
+
+
+# --------------------------------------- P29: palm + hibiscus edges ----
+
+## P29: dense planting from the new Tripo models — palm sentinels layered
+## deep at the route edges (background depth) and hibiscus bushes mid-line,
+## plus extra plant_a/b so no stretch reads empty. One node per plant
+## (single-surface GLBs, tamed metals via ModelSwap) — ~28 draw calls,
+## capped and shadow-disciplined for the mobile budget. Missing GLBs are
+## skipped silently (the quad systems underneath still dress the route).
+const PALM_COUNT := 6
+const HIBISCUS_COUNT := 10
+const EDGE_PLANT_COUNT := 12
+
+
+func _plant_palm_hibiscus() -> void:
+	_rng.seed = 20260914
+	var parent := get_parent()
+	# Palms: tall background sentinels, well off the track.
+	for i in PALM_COUNT:
+		var palm := ModelSwap.make_visual("palm", 3.4)
+		if palm == null:
+			break
+		palm.name = "PalmPlant%d" % (i + 1)
+		var side := 1.0 if i % 2 == 0 else -1.0
+		palm.position = Vector3(side * _rng.randf_range(9.0, 15.0), -0.06,
+			_rng.randf_range(-350.0, -20.0))
+		palm.scale = Vector3(0.78, 1.0, 0.78) # P29: slim the cubic Tripo palm.
+		palm.rotation.y = _rng.randf() * TAU
+		parent.call_deferred("add_child", palm)
+	# Hibiscus: flowering bushes along the mid-line edges.
+	for i in HIBISCUS_COUNT:
+		var hb := ModelSwap.make_visual("hibiscus", 1.15)
+		if hb == null:
+			break
+		hb.name = "Hibiscus%d" % (i + 1)
+		var side := 1.0 if i % 2 == 0 else -1.0
+		# P29: sink 0.16m to bury the Tripo pot; the bush reads as planted.
+		hb.position = Vector3(side * _rng.randf_range(3.5, 8.5), -0.16,
+			_rng.randf_range(-350.0, -10.0))
+		hb.rotation.y = _rng.randf() * TAU
+		parent.call_deferred("add_child", hb)
+	# Extra real plants fill the near-edge gaps.
+	var variants := ["plant_a", "plant_b"]
+	for i in EDGE_PLANT_COUNT:
+		var pl := ModelSwap.make_visual(variants[i % 2], 0.75)
+		if pl == null:
+			break
+		pl.name = "EdgePlant%d" % (i + 1)
+		var side := 1.0 if i % 2 == 0 else -1.0
+		pl.position = Vector3(side * _rng.randf_range(2.6, 6.5), 0,
+			_rng.randf_range(-350.0, -5.0))
+		pl.rotation.y = _rng.randf() * TAU
+		for c in pl.get_children():
+			if c is Node3D:
+				for m in (c as Node3D).find_children("*", "MeshInstance3D", true, false):
+					(m as MeshInstance3D).cast_shadow = \
+						GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		parent.call_deferred("add_child", pl)

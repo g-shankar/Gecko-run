@@ -12,7 +12,7 @@ extends "res://scripts/systems/hazard_base.gd"
 @export var hover_height: float = 3.0 ## Shoe hover height (m).
 @export var shoe_size: Vector3 = Vector3(1.3, 0.9, 2.2)
 
-var _shoe: MeshInstance3D
+var _shoe: Node3D ## P29: was a MeshInstance3D box; now a sneaker model wrapper.
 var _shadow: MeshInstance3D
 var _shadow_mat: StandardMaterial3D
 var _home_x: float = 0.0
@@ -35,15 +35,15 @@ func _build() -> void:
 	zone.shape = zone_shape
 	zone.position = Vector3(0, 0.5, 0)
 	add_child(zone)
-	# The shoe: a big brown box.
-	_shoe = MeshInstance3D.new()
-	var shoe_mesh := BoxMesh.new()
-	shoe_mesh.size = shoe_size
-	_shoe.mesh = shoe_mesh
-	var shoe_mat := StandardMaterial3D.new()
-	shoe_mat.albedo_color = Color(0.45, 0.28, 0.15, 1.0) # Leather brown.
-	shoe_mat.roughness = 0.8
-	_shoe.material_override = shoe_mat
+	# The shoe: a real sneaker (Tripo) fitted to the stomp footprint.
+	# The slam animation targets _shoe.position, which works on the wrapper.
+	_shoe = _fit_sneaker()
+	if _shoe == null:
+		_shoe = _shoe_box_fallback()
+	else:
+		# The wrapper's origin is the sole: slam to the ground, not to
+		# half the box height (the fallback keeps the old math).
+		_slam_y = 0.05
 	_shoe.position = Vector3(0, hover_height, 0)
 	add_child(_shoe)
 	# The telegraph shadow: a dark ellipse on the ground.
@@ -59,6 +59,48 @@ func _build() -> void:
 	_shadow.position = Vector3(0, 0.03, 0)
 	_shadow.visible = false
 	add_child(_shadow)
+
+
+## P29: fit the Tripo sneaker to the stomp footprint (x=1.3 wide,
+## z=2.2 long). Whichever horizontal axis is longest becomes the length
+## (rotated onto Z); the base rests at the wrapper origin so the slam
+## math (_slam_y etc.) is unchanged. Returns null if the GLB is missing.
+func _fit_sneaker() -> Node3D:
+	if not ModelSwap.MODELS.has("sneaker"):
+		return null
+	var spec: Dictionary = ModelSwap.MODELS["sneaker"]
+	var packed: PackedScene = load(spec["path"])
+	if packed == null:
+		return null
+	var inst: Node = packed.instantiate()
+	var size: Vector3 = spec["size"]
+	var longest: float = maxf(size.x, size.z)
+	if longest < 0.001:
+		inst.queue_free()
+		return null
+	var s: float = shoe_size.z / longest
+	var wrap := Node3D.new()
+	wrap.name = "SneakerShoe"
+	wrap.add_child(inst)
+	inst.scale = Vector3.ONE * s
+	inst.position.y = -float(spec["min_y"]) * s
+	if size.x > size.z:
+		# Length lies along X natively: rotate it onto Z.
+		wrap.rotation.y = PI / 2.0
+	return wrap
+
+
+## P29 fallback: the old brown box if the sneaker GLB is missing.
+func _shoe_box_fallback() -> Node3D:
+	var box := MeshInstance3D.new()
+	var shoe_mesh := BoxMesh.new()
+	shoe_mesh.size = shoe_size
+	box.mesh = shoe_mesh
+	var shoe_mat := StandardMaterial3D.new()
+	shoe_mat.albedo_color = Color(0.45, 0.28, 0.15, 1.0) # Leather brown.
+	shoe_mat.roughness = 0.8
+	box.material_override = shoe_mat
+	return box
 
 
 func _on_telegraph() -> void:

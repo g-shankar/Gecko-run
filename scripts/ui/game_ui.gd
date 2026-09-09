@@ -547,7 +547,7 @@ func _build_hud() -> void:
 	# Sits just below the minimap (map bottom = y170, bar top = y170).
 	var abox := VBoxContainer.new()
 	abox.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
-	abox.position = Vector2(-112, -190)
+	abox.position = Vector2(-128, -190) ## P29: was -112 — slots are 112 wide now.
 	abox.add_theme_constant_override("separation", 12)
 	abox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hud.add_child(abox)
@@ -555,15 +555,18 @@ func _build_hud() -> void:
 		var id := String(def["id"])
 		var slot := Button.new()
 		slot.text = "%s\n%s" % [String(def["icon"]), String(def["name"])]
-		slot.custom_minimum_size = Vector2(92, 92)
-		slot.add_theme_font_size_override("font_size", 24)
+		## P29: was 92x92 at font 24 — "SHIELD" clipped under the charge
+		## badge ("SHIEL"). Wider slot, smaller name font, badge moved to
+		## the top-right corner so it never sits on the text.
+		slot.custom_minimum_size = Vector2(112, 96)
+		slot.add_theme_font_size_override("font_size", 20)
 		slot.mouse_filter = Control.MOUSE_FILTER_STOP
 		slot.pressed.connect(_on_ability_pressed.bind(id))
 		abox.add_child(slot)
 		_ability_buttons[id] = slot
 		var badge := _make_badge("0")
-		badge.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-		badge.position = Vector2(-34, -34)
+		badge.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		badge.position = Vector2(-34, 2)
 		slot.add_child(badge)
 		_ability_badges[id] = badge.get_node("Label")
 	# --- Bottom-left: the MISSION panel. ---

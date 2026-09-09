@@ -8,7 +8,7 @@ extends Node3D
 ##
 ## Runs AFTER BackyardArt (tree order) and re-grades its environment/sun.
 
-const POLLEN_COUNT := 28
+const POLLEN_COUNT := 18 ## P29: was 28 — sparse, small, additive, subtle.
 const TUFT_COUNT := 260
 
 
@@ -139,16 +139,19 @@ func _grade_environment() -> void:
 ## P28.5: golden-hour sun — lower (long soft shadows), warmer. Shadow
 ## distance capped at 60 m: crisp near the gecko (the macro view), cheap
 ## everywhere else. Atlas size lives in project.godot (2048, GL-safe).
+## P29: pushed warmer + lower for the late-afternoon key-art grade —
+## longer raking shadows, hotter rim on the gecko's flank.
 func _warm_the_sun() -> void:
 	var sun := get_parent().get_node_or_null("Sun") as DirectionalLight3D
 	if sun == null:
 		return
-	sun.light_color = Color(1.0, 0.80, 0.55)
-	sun.light_energy = 1.6
+	sun.light_color = Color(1.0, 0.68, 0.40)
+	sun.light_energy = 1.75
 	# P28.5: yaw -65 rakes the low sun ACROSS the track (not from behind the
 	# camera) — the gecko's flank gets modeled light/shade and shadows
 	# stretch diagonally, the golden-hour look from the key art.
-	sun.rotation_degrees = Vector3(-28, -65, 0)
+	# P29: elevation -28 -> -21 (lower sun, longer shadows).
+	sun.rotation_degrees = Vector3(-21, -68, 0)
 	sun.directional_shadow_max_distance = 60.0
 	sun.shadow_enabled = true
 	_add_bounce_fill()
@@ -237,6 +240,10 @@ func _attach_foreground() -> void:
 
 ## Golden pollen motes drifting around the camera — they ride along for the
 ## whole route because they are parented to the camera rig, not the world.
+## P29: the old motes read as oversized yellow balls in screenshots, so
+## they are now small, soft, sparse, and ADDITIVE — a faint shimmer in the
+## light, not floating orbs. (The golden collectible orbs are bug pickups;
+## those became spinning coins in bug_pickup.gd.)
 func _spawn_pollen() -> void:
 	var rig := get_tree().get_first_node_in_group("camera_rig") as Node3D
 	if rig == null:
@@ -260,14 +267,15 @@ func _spawn_pollen() -> void:
 	pm.damping_max = 0.2
 	pm.scale_min = 0.5
 	pm.scale_max = 1.0
-	pm.color = Color(1.0, 0.95, 0.75, 0.3)
+	pm.color = Color(1.0, 0.95, 0.75, 0.16) ## P29: was 0.3 — subtle.
 	p.process_material = pm
 	var quad := QuadMesh.new()
-	quad.size = Vector2(0.02, 0.02)
+	quad.size = Vector2(0.014, 0.014) ## P29: was 0.02 — small.
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.albedo_color = Color(1.0, 0.95, 0.75, 0.3)
+	mat.albedo_color = Color(1.0, 0.95, 0.75, 0.16)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD ## P29: additive shimmer.
 	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 	mat.disable_fog = true
 	quad.material = mat

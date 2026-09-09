@@ -17,8 +17,8 @@ extends "res://scripts/systems/hazard_base.gd"
 
 var _base: MeshInstance3D
 var _head: Node3D ## P25: was MeshInstance3D; now a model wrapper (or primitive fallback).
-var _fan: MeshInstance3D
-var _fan_mat: StandardMaterial3D
+var _fan_pivot: Node3D ## P29: the sweep pivot; carries the droplet spray.
+var _spray: GPUParticles3D ## P29: real arcing water droplets (was a glass slab).
 var _sputter: MeshInstance3D
 var _sweep_phase: float = 0.0
 
@@ -66,20 +66,41 @@ func _build() -> void:
 	_head.position = Vector3(0, 0.05, 0) # Retracted.
 	add_child(_head)
 	_swap_head_model() # P25: real sprinkler model; primitive stays on failure.
-	# Water fan: translucent blue box, pivots at the head.
-	_fan = MeshInstance3D.new()
-	var fan_mesh := BoxMesh.new()
-	fan_mesh.size = Vector3(fan_width, 0.9, fan_length)
-	_fan.mesh = fan_mesh
-	_fan_mat = StandardMaterial3D.new()
-	_fan_mat.albedo_color = Color(0.3, 0.65, 1.0, 0.0)
-	_fan_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_fan_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_fan.material_override = _fan_mat
-	# Pivot at the head: offset so rotation sweeps the fan.
-	_fan.position = Vector3(0, pop_height + 0.45, -fan_length * 0.5)
-	_fan.visible = false
-	add_child(_fan)
+	# Water spray: real arcing droplets from the nozzle. The pivot sweeps;
+	# the droplets live in global space so the arc reads as a fan.
+	_fan_pivot = Node3D.new()
+	_fan_pivot.name = "FanPivot"
+	_fan_pivot.position = Vector3(0, pop_height + 0.25, 0)
+	add_child(_fan_pivot)
+	_spray = GPUParticles3D.new()
+	_spray.name = "Spray"
+	_spray.amount = 220
+	_spray.lifetime = 0.8
+	_spray.local_coords = false
+	_spray.emitting = false
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	pm.emission_sphere_radius = 0.06
+	pm.direction = Vector3(0, 0.42, -1) # Up-and-out: the arc.
+	pm.spread = 13.0
+	pm.initial_velocity_min = 4.2
+	pm.initial_velocity_max = 6.2
+	pm.gravity = Vector3(0, -9.8, 0)
+	pm.damping_min = 0.2
+	pm.damping_max = 0.6
+	pm.scale_min = 0.6
+	pm.scale_max = 1.3
+	_spray.process_material = pm
+	var drop := SphereMesh.new()
+	drop.radius = 0.035
+	drop.height = 0.07
+	var drop_mat := StandardMaterial3D.new()
+	drop_mat.albedo_color = Color(0.55, 0.8, 1.0, 0.85)
+	drop_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	drop_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	drop.material = drop_mat
+	_spray.draw_pass_1 = drop
+	_fan_pivot.add_child(_spray)
 	# Telegraph sputter: small white puff above the head.
 	_sputter = MeshInstance3D.new()
 	var sput_mesh := SphereMesh.new()
@@ -115,16 +136,16 @@ func _on_telegraph() -> void:
 
 
 func _on_activate() -> void:
-	_fan.visible = true
+	_spray.emitting = true
 	_sputter.visible = false
 
 
 func _on_recover() -> void:
-	pass
+	pass # Spray winds down in _tick_phase (pressure drop at t >= 0.4).
 
 
 func _on_idle() -> void:
-	_fan.visible = false
+	_spray.emitting = false
 	_sputter.visible = false
 
 
@@ -140,18 +161,16 @@ func _tick_phase(delta: float) -> void:
 			var s: float = lerpf(0.5, 1.2, t)
 			_sputter.scale = Vector3(s, s, s)
 		Phase.ACTIVE:
-			# Full pressure: head stays up, fan sweeps sinusoidally.
+			# Full pressure: head stays up, spray sweeps sinusoidally.
 			_head.position.y = pop_height
 			_sweep_phase += delta * sweep_speed * TAU
 			var ang: float = sin(_sweep_phase) * deg_to_rad(sweep_degrees * 0.5)
-			_fan.rotation.y = ang
-			_fan_mat.albedo_color.a = 0.55 ## P28.5+: water reads on rich grass.
+			_fan_pivot.rotation.y = ang
 		Phase.RECOVERY:
 			var t: float = 1.0 - (_phase_timer / recovery_time)
-			# Pressure drops: fan fades, head retracts.
-			_fan_mat.albedo_color.a = lerpf(0.55, 0.0, t)
+			# Pressure drops: spray stops, head retracts.
+			if t >= 0.4:
+				_spray.emitting = false
 			_head.position.y = lerpf(pop_height, 0.05, t)
-			if t >= 1.0:
-				_fan.visible = false
 		Phase.IDLE:
 			_head.position.y = lerpf(_head.position.y, 0.05, 0.2)

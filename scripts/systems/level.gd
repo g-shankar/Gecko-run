@@ -89,6 +89,15 @@ func _build_all() -> void:
 	_place_fence() ## P21: the fence stands at the route's end.
 	_stretch_ground() ## P21: the visual ground must cover the long route.
 	_repaint_pergola() ## P26: re-apply the wood skin after a rebuild.
+	_refresh_driveway() ## P29: wet driveway only on Backyard Dash.
+
+
+## P29: route swaps reuse the same BackyardArt node; the wet driveway must
+## hide when the player switches to Fence Line mid-session.
+func _refresh_driveway() -> void:
+	var art := get_parent().get_node_or_null("BackyardArt")
+	if art != null and art.has_method("refresh_driveway_for_map"):
+		art.refresh_driveway_for_map()
 
 
 ## P26: BackyardArt paints the pergola once at startup; after a route swap
