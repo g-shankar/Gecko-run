@@ -34,7 +34,7 @@ func _run() -> void:
 	_frame_cam(Vector3(0.8, 1.6, 6.2), Vector3(0, 0.7, 0))
 	await _shot("shot_1_run.png")
 	# 2: FOOTSTEP — the shadow blooms, the shoe hangs overhead.
-	var fs: Area3D = _scene.get_node("Level/FootstepA")
+	var fs: Area3D = _scene.get_node("FootstepA")
 	fs.visible = true
 	fs.position = Vector3(0, 0, -6)
 	fs.set_physics_process(true)
@@ -69,7 +69,7 @@ func _frame_cam(pos: Vector3, target: Vector3) -> void:
 
 
 func _hide_all_hazards() -> void:
-	for hn in ["Level/FootstepA", "Level/FootstepB", "Level/Bicycle", "Level/BackingCar"]:
+	for hn in ["FootstepA", "FootstepB", "Bicycle", "BackingCar"]:
 		var hz: Area3D = _scene.get_node(hn)
 		hz.set_physics_process(false)
 		hz.visible = false

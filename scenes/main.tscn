@@ -7,8 +7,6 @@
 [ext_resource type="Script" path="res://scripts/systems/car.gd" id="5"]
 [ext_resource type="Script" path="res://scripts/systems/bird.gd" id="6"]
 [ext_resource type="Script" path="res://scripts/systems/shield_pickup.gd" id="7"]
-[ext_resource type="Script" path="res://scripts/systems/level.gd" id="8"]
-[ext_resource type="Script" path="res://scripts/ui/game_ui.gd" id="9"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
 sky_top_color = Color(0.3, 0.52, 0.88, 1)
@@ -120,25 +118,43 @@ shape = SubResource("BoxShape3D_planter")
 [node name="MeshInstance3D" type="MeshInstance3D" parent="PlanterBoxB"]
 mesh = SubResource("BoxMesh_planter")
 
-[node name="Fence" type="StaticBody3D" parent="." groups=["climbable"]]
+[node name="FootstepA" type="Area3D" parent="."]
+position = Vector3(0, 0, -6)
+script = ExtResource("3")
+
+[node name="FootstepB" type="Area3D" parent="."]
+position = Vector3(1.5, 0, -13)
+script = ExtResource("3")
+
+[node name="Bicycle" type="Area3D" parent="."]
+position = Vector3(0, 0, -9)
+script = ExtResource("4")
+
+[node name="BackingCar" type="Area3D" parent="."]
+position = Vector3(6, 0, -17)
+script = ExtResource("5")
+
+[node name="Bird" type="Area3D" parent="."]
+position = Vector3(0, 0, -11)
+script = ExtResource("6")
+
+[node name="ShieldPickup" type="Area3D" parent="."]
+position = Vector3(0, 0, -4)
+script = ExtResource("7")
+
+[node name="TestWall" type="StaticBody3D" parent="." groups=["climbable"]]
 position = Vector3(0, 2.5, -20)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Fence"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TestWall"]
 shape = SubResource("BoxShape3D_testwall")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Fence"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="TestWall"]
 mesh = SubResource("BoxMesh_testwall")
-
-[node name="Level" type="Node3D" parent="."]
-script = ExtResource("8")
 
 [node name="Gecko" parent="." instance=ExtResource("1")]
 position = Vector3(0, 0.2, 6)
 
 [node name="CameraRig" parent="." instance=ExtResource("2")]
-
-[node name="GameUI" type="CanvasLayer" parent="."]
-script = ExtResource("9")
 # Note: the rig auto-discovers its target via the "gecko" group (see
 # camera_rig.gd). A `target = NodePath("../Gecko")` override does NOT work
 # here -- Godot 4 does not reliably resolve NodePath overrides that point

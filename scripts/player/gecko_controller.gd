@@ -1,16 +1,5 @@
 extends CharacterBody3D
 
-
-func _gs() -> Node:
-	# GameState autoload, via tree lookup (works in game and in --script tests).
-	# Returns null if not present (e.g. unit tests that don't need it).
-	return get_tree().root.get_node_or_null("GameState")
-
-
-func _gs_running() -> bool:
-	var gs := _gs()
-	return gs == null or gs.current_state == gs.State.RUNNING
-
 const DebugHUDScript := preload("res://scripts/dev/debug_hud.gd")
 
 ## Gecko Run — player controller, gray-box prototype.
@@ -147,16 +136,6 @@ func _input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	# P14: the run only moves when the GameState says RUNNING.
-	# READY (start screen): idle in place. FINISHED (game over): stop.
-	# (If no GameState — e.g. unit tests — just run.)
-	if not _gs_running():
-		velocity.x = 0.0
-		velocity.z = 0.0
-		if not is_on_floor():
-			velocity.y -= 22.0 * delta
-		move_and_slide()
-		return
 	if _touch_active:
 		_touch_time += delta
 	if _adhere_cooldown > 0.0:
@@ -171,10 +150,6 @@ func _physics_process(delta: float) -> void:
 		if _shield_timer <= 0.0:
 			shield_charges = 0
 			_shield_bubble.visible = false
-	# P14: score = meters from the start line.
-	var gs := _gs()
-	if gs != null:
-		gs.score = maxi(0, int(_spawn_pos.z - global_position.z))
 	# P10: while DEAD, just count down to respawn. No movement, no input.
 	if state == MoveState.DEAD:
 		_respawn_timer -= delta
@@ -326,21 +301,8 @@ func die() -> void:
 	state = MoveState.DEAD
 	stat_state = "DEAD"
 	stat_deaths += 1
-	var gs := _gs()
-	if gs != null:
-		gs.deaths += 1
-		if gs.deaths >= gs.max_lives:
-			# P14: out of lives. No respawn — the game-over screen takes it.
-			gs.finish_run()
-			return
 	_respawn_timer = 0.8
 	velocity = Vector3.ZERO
-
-
-## P14: full reset for "RUN AGAIN" — back to the start line, fresh lives.
-func reset_for_new_run() -> void:
-	_respawn()
-	stat_deaths = 0
 
 
 ## P12: grant one shield charge (10 s expiry). Called by shield pickups.
