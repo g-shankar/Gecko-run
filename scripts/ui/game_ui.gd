@@ -25,6 +25,7 @@ var _lives_label: Label
 var _shield_label: Label
 var _near_miss_label: Label ## P15: "NEAR MISS +50!" popup.
 var _near_miss_timer: float = 0.0
+var _combo_label: Label ## P17: "COMBO x3" indicator.
 var _final_score_label: Label
 var _best_label: Label
 
@@ -46,6 +47,7 @@ func _ready() -> void:
 	gs.score_changed.connect(_on_score_changed)
 	gs.deaths_changed.connect(_on_deaths_changed)
 	gs.near_misses_changed.connect(_on_near_miss)
+	gs.combo_changed.connect(_on_combo_changed)
 
 
 func _on_state_changed(new_state: int) -> void:
@@ -73,6 +75,15 @@ func _on_near_miss(_new_count: int) -> void:
 	_near_miss_label.visible = true
 	_near_miss_label.modulate.a = 1.0
 	_near_miss_timer = 1.2
+
+
+## P17: show/hide the combo multiplier.
+func _on_combo_changed(new_combo: int) -> void:
+	if new_combo >= 2:
+		_combo_label.text = "COMBO x%d" % new_combo
+		_combo_label.visible = true
+	else:
+		_combo_label.visible = false
 
 
 func _process(delta: float) -> void:
@@ -182,6 +193,13 @@ func _build_hud() -> void:
 	_near_miss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_near_miss_label.visible = false
 	_hud.add_child(_near_miss_label)
+	# P17: combo indicator, top-right below pause. Hidden until x2.
+	_combo_label = _make_label("COMBO x2", 32)
+	_combo_label.add_theme_color_override("font_color", Color(1.0, 0.5, 0.2))
+	_combo_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_combo_label.position = Vector2(-220, 100)
+	_combo_label.visible = false
+	_hud.add_child(_combo_label)
 
 
 func _on_pause_pressed() -> void:
