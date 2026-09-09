@@ -35,35 +35,10 @@ func _build() -> void:
 	zone.shape = zone_shape
 	zone.position = Vector3(0, 0.6, 0)
 	add_child(zone)
-	# The bird: P25 real hawk model in a dive stoop. Falls back to the
-	# primitive body/wings if the GLB fails to load. The circle/dive/flap
-	# animation drives _bird itself, so it works on the model either way.
+	# The bird: body + two wings + tail, dark silhouette.
 	_bird = Node3D.new()
-	_bird.name = "BirdVisual" # P25: named so tests/captures can find it.
 	_bird.position = Vector3(0, circle_height, 0)
 	add_child(_bird)
-	var model := ModelSwap.make_visual("bird", 1.8)
-	if model == null:
-		_build_primitive_bird()
-	else:
-		_bird.add_child(model)
-	# The telegraph shadow: dark ellipse on the grass.
-	_shadow = MeshInstance3D.new()
-	var shadow_mesh := PlaneMesh.new()
-	shadow_mesh.size = Vector2(1.8, 1.8)
-	_shadow.mesh = shadow_mesh
-	_shadow_mat = StandardMaterial3D.new()
-	_shadow_mat.albedo_color = Color(0.05, 0.05, 0.08, 0.0)
-	_shadow_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_shadow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_shadow.material_override = _shadow_mat
-	_shadow.position = Vector3(0, 0.03, 0)
-	_shadow.visible = false
-	add_child(_shadow)
-
-
-## P25: the old primitive bird, kept as a fallback if the model is missing.
-func _build_primitive_bird() -> void:
 	var body := MeshInstance3D.new()
 	var body_mesh := CapsuleMesh.new()
 	body_mesh.radius = 0.22
@@ -82,6 +57,19 @@ func _build_primitive_bird() -> void:
 		wing.position = Vector3(wx, 0.1, 0)
 		wing.material_override = dark
 		_bird.add_child(wing)
+	# The telegraph shadow: dark ellipse on the grass.
+	_shadow = MeshInstance3D.new()
+	var shadow_mesh := PlaneMesh.new()
+	shadow_mesh.size = Vector2(1.8, 1.8)
+	_shadow.mesh = shadow_mesh
+	_shadow_mat = StandardMaterial3D.new()
+	_shadow_mat.albedo_color = Color(0.05, 0.05, 0.08, 0.0)
+	_shadow_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_shadow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_shadow.material_override = _shadow_mat
+	_shadow.position = Vector3(0, 0.03, 0)
+	_shadow.visible = false
+	add_child(_shadow)
 
 
 func _on_telegraph() -> void:

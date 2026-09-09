@@ -10,7 +10,7 @@ extends "res://scripts/systems/hazard_base.gd"
 @export var park_x: float = -0.5 ## Where it stops (middle-ish of the track).
 @export var start_x: float = 6.0 ## Where it waits (off the track).
 
-var _body: Node3D ## P25: was MeshInstance3D; now the car model wrapper (or primitive).
+var _body: MeshInstance3D
 var _light_l: MeshInstance3D
 var _light_r: MeshInstance3D
 var _light_mat: StandardMaterial3D
@@ -38,17 +38,30 @@ func _build() -> void:
 	zone.shape = zone_shape
 	zone.position = Vector3(0, 0.8, 0)
 	add_child(zone)
-	# Body: P25 real SUV model. Falls back to the primitive boxes if the GLB
-	# fails to load. The telegraph shudder animates _body.position.x, which
-	# works on the wrapper either way.
-	_body = Node3D.new()
-	_body.name = "CarVisual"
+	# Body: long box, dusty blue.
+	_body = MeshInstance3D.new()
+	var body_mesh := BoxMesh.new()
+	body_mesh.size = Vector3(4.0, 1.0, 1.8)
+	_body.mesh = body_mesh
+	_body.position = Vector3(0, 0.7, 0)
+	var body_mat := StandardMaterial3D.new()
+	body_mat.albedo_color = Color(0.3, 0.45, 0.65, 1.0)
+	body_mat.roughness = 0.4
+	body_mat.metallic = 0.3
+	_body.material_override = body_mat
 	add_child(_body)
-	var model := ModelSwap.make_visual("car", 4.2)
-	if model == null:
-		_build_primitive_car()
-	else:
-		_body.add_child(model)
+	# Cabin.
+	var cabin := MeshInstance3D.new()
+	var cabin_mesh := BoxMesh.new()
+	cabin_mesh.size = Vector3(2.0, 0.7, 1.6)
+	cabin.mesh = cabin_mesh
+	cabin.position = Vector3(-0.3, 1.5, 0)
+	var cabin_mat := StandardMaterial3D.new()
+	cabin_mat.albedo_color = Color(0.15, 0.2, 0.28, 1.0)
+	cabin_mat.roughness = 0.2
+	cabin_mat.metallic = 0.4
+	cabin.material_override = cabin_mat
+	add_child(cabin)
 	# Reverse lights: two small red boxes on the rear (+X face). They flash
 	# during TELEGRAPH and stay lit while backing up.
 	_light_mat = StandardMaterial3D.new()
@@ -68,34 +81,6 @@ func _build() -> void:
 			_light_l = light
 		else:
 			_light_r = light
-
-
-## P25: the old primitive car, kept as a fallback if the model is missing.
-func _build_primitive_car() -> void:
-	# Body: long box, dusty blue.
-	var body := MeshInstance3D.new()
-	var body_mesh := BoxMesh.new()
-	body_mesh.size = Vector3(4.0, 1.0, 1.8)
-	body.mesh = body_mesh
-	body.position = Vector3(0, 0.7, 0)
-	var body_mat := StandardMaterial3D.new()
-	body_mat.albedo_color = Color(0.3, 0.45, 0.65, 1.0)
-	body_mat.roughness = 0.4
-	body_mat.metallic = 0.3
-	body.material_override = body_mat
-	_body.add_child(body)
-	# Cabin.
-	var cabin := MeshInstance3D.new()
-	var cabin_mesh := BoxMesh.new()
-	cabin_mesh.size = Vector3(2.0, 0.7, 1.6)
-	cabin.mesh = cabin_mesh
-	cabin.position = Vector3(-0.3, 1.5, 0)
-	var cabin_mat := StandardMaterial3D.new()
-	cabin_mat.albedo_color = Color(0.15, 0.2, 0.28, 1.0)
-	cabin_mat.roughness = 0.2
-	cabin_mat.metallic = 0.4
-	cabin.material_override = cabin_mat
-	_body.add_child(cabin)
 
 
 func _on_telegraph() -> void:

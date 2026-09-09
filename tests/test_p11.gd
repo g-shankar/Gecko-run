@@ -17,24 +17,14 @@ func _run() -> void:
 	var packed: PackedScene = load("res://scenes/main.tscn")
 	var scene: Node = packed.instantiate()
 	root.add_child(scene)
-	# P14: the GameState autoload starts in READY (start screen). Tests
-	# bypass it: wait a beat for it to load, then remove it so the gecko
-	# runs immediately (gs==null means "just run").
-	for _i in 10:
-		await process_frame
-		if root.has_node("GameState"):
-			break
-	var _gs: Node = root.get_node_or_null("GameState")
-	if _gs != null:
-		_gs.queue_free()
 	_gecko = scene.get_node("Gecko")
 	# Park the footsteps out of the way: this test is about bike + car.
 	for fn in ["FootstepA", "FootstepB"]:
-		var fs: Area3D = scene.get_node("Level/" + fn)
+		var fs: Area3D = scene.get_node(fn)
 		fs.set_physics_process(false)
 		fs.position.x = 100.0
-	var bike: Area3D = scene.get_node("Level/Bicycle")
-	var car: Area3D = scene.get_node("Level/BackingCar")
+	var bike: Area3D = scene.get_node("Bicycle")
+	var car: Area3D = scene.get_node("BackingCar")
 	# Bicycle: wait for the crossing, verify it sweeps the track.
 	var crossed := false
 	var x_start: float = 0.0
@@ -49,13 +39,10 @@ func _run() -> void:
 			break
 	_check("bicycle crosses the track during ACTIVE", crossed)
 	# Bicycle kill: freeze it mid-crossing, put the gecko on it.
-	# P21: the long route may leave the gecko mid death/respawn — reset first.
-	# The bike's kill zone sits at its lane (z=-11); park the gecko inside it.
-	_gecko.call("_respawn")
 	bike._enter_phase(2)
 	bike.set_physics_process(false)
 	bike.position.x = 0.0
-	_gecko.global_position = Vector3(0, 0.2, -10.8)
+	_gecko.global_position = Vector3(0, 0.2, -9)
 	await physics_frame # Let the physics server register the overlap.
 	bike._check_overlaps()
 	for i in range(10):

@@ -1,16 +1,5 @@
 extends CharacterBody3D
 
-
-func _gs() -> Node:
-	# GameState autoload, via tree lookup (works in game and in --script tests).
-	# Returns null if not present (e.g. unit tests that don't need it).
-	return get_tree().root.get_node_or_null("GameState")
-
-
-func _gs_running() -> bool:
-	var gs := _gs()
-	return gs == null or gs.current_state == gs.State.RUNNING
-
 const DebugHUDScript := preload("res://scripts/dev/debug_hud.gd")
 
 ## Gecko Run — player controller, gray-box prototype.
@@ -32,8 +21,6 @@ const DebugHUDScript := preload("res://scripts/dev/debug_hud.gd")
 
 ## --- Tuning (spec §7) -------------------------------------------------------
 @export var run_speed: float = 5.0     ## Constant auto-forward speed (m/s).
-@export var speed_ramp: float = 0.15  ## P16: +m/s per second of run time.
-@export var max_speed: float = 9.0    ## P16: speed ramp ceiling (m/s).
 @export var steer_speed: float = 3.2   ## Top sideways speed (m/s).
 @export var steer_accel: float = 18.0  ## How snappy steering feels (m/s^2).
 @export var gravity: float = 22.0      ## Snappier than Earth's 9.8: arcade feel.
@@ -85,12 +72,7 @@ var stat_deaths: int = 0 ## P10: times squashed.
 var shield_charges: int = 0 ## P12: hits the shield can still absorb.
 var _shield_timer: float = 0.0 ## P12: shield expiry countdown.
 var _shield_bubble: MeshInstance3D ## P12: the visible bubble.
-var _speed_boost_timer: float = 0.0 ## P19: seconds of 1.5x speed left.
-var _speed_trail: MeshInstance3D ## P19: motion-streak visual during boost.
-const SPEED_BOOST_DURATION: float = 6.0 ## P19: boost length (s).
-const SPEED_BOOST_MULT: float = 1.5 ## P19: speed multiplier while boosted.
 var _spawn_pos: Vector3 ## P10: where a respawn puts you.
-var _last_dist: int = 0 ## P15: last distance banked into the score.
 var _respawn_timer: float = 0.0 ## P10: countdown while DEAD.
 var _jump_start_y: float = 0.0
 
@@ -107,19 +89,6 @@ var _dash_timer: float = 0.0 ## P8: time left in the current dash.
 var _dash_cooldown: float = 0.0 ## P8: time until dash is available again.
 var _dash_requested: bool = false ## P8: set by the mobile dash button.
 
-## P22: squash & stretch target the VISUAL only — the CollisionShape3D (the
-## hitbox) is a sibling, so it never pulses. P23: the visual is the Tripo
-## hero gecko, rotated 90° about Y to face -Z, so its local Y is the
-## gecko's up and local Z is lateral.
-@onready var _visual: MeshInstance3D = $MeshInstance3D
-var _squash_tween: Tween ## P22: the active scale-recovery tween, if any.
-
-## P23: the Tripo hero gecko (decimated to ~9.6k verts). Only the mesh is
-## swapped — the CharacterBody3D, collision capsule and this script stay.
-const HERO_SCENE: PackedScene = preload("res://assets/gecko/hero_gecko.glb")
-## P23: hero footprint vs the 0.5-wide collision capsule.
-const VISUAL_BASE_SCALE := 0.85
-
 @onready var _wall_ray_l: RayCast3D = $WallRayL
 @onready var _wall_ray_r: RayCast3D = $WallRayR
 
@@ -127,11 +96,7 @@ const VISUAL_BASE_SCALE := 0.85
 func _ready() -> void:
 	_ensure_input_actions()
 	_spawn_pos = global_position
-	_last_dist = 0
-	_swap_hero_mesh() ## P23: capsule visual -> Tripo gecko (fallback: capsule).
-	GeckoSkins.apply_skin(_visual, _selected_skin()) ## P23: persisted choice.
 	_build_shield_bubble()
-	_build_speed_trail() ## P19.
 	# The feeler rays must ignore the gecko's own body, and their length
 	# follows the exported tuning (the .tscn value is only a default).
 	for ray: RayCast3D in [_wall_ray_l, _wall_ray_r]:
@@ -141,42 +106,6 @@ func _ready() -> void:
 	var hud := DebugHUDScript.new()
 	hud.setup(self)
 	add_child(hud)
-
-
-## P23: swap the capsule mesh for the Tripo hero gecko. The imported .glb
-## is a PackedScene (not a Mesh), so we instance it once, steal the
-## ArrayMesh (its surface material carries the PBR textures), and free it.
-## If anything fails, the capsule stays — the game never breaks.
-func _swap_hero_mesh() -> void:
-	var inst: Node = HERO_SCENE.instantiate()
-	var hero_mi := _find_first_mesh(inst)
-	if hero_mi != null and hero_mi.mesh != null:
-		_visual.mesh = hero_mi.mesh
-		_visual.scale = Vector3.ONE * VISUAL_BASE_SCALE
-	inst.queue_free()
-
-
-func _find_first_mesh(n: Node) -> MeshInstance3D:
-	if n is MeshInstance3D:
-		return n as MeshInstance3D
-	for c in n.get_children():
-		var found := _find_first_mesh(c)
-		if found != null:
-			return found
-	return null
-
-
-## P23: the player's persisted skin choice (GameState), default 0.
-func _selected_skin() -> int:
-	var gs := _gs()
-	if gs != null and "selected_skin" in gs:
-		return int(gs.selected_skin)
-	return 0
-
-
-## P23: re-apply the skin live (character select on the start screen).
-func apply_selected_skin() -> void:
-	GeckoSkins.apply_skin(_visual, _selected_skin())
 
 
 ## Touch controls for the phone playtest builds — Subway Surfers grammar:
@@ -207,28 +136,6 @@ func _input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	# P10: while DEAD, just count down to respawn. No movement, no input.
-	# P22: this runs BEFORE the _gs_running() gate — register_death() parks
-	# GameState in DEAD, and the respawn is what brings the run back. The
-	# game-over path never arms the timer, so it can't respawn from there.
-	if state == MoveState.DEAD:
-		if _respawn_timer > 0.0:
-			_respawn_timer -= delta
-			# Squash flat for readable feedback.
-			scale.y = maxf(0.15, scale.y - delta * 5.0)
-			if _respawn_timer <= 0.0:
-				_respawn()
-		return
-	# P14: the run only moves when the GameState says RUNNING.
-	# READY (start screen): idle in place. FINISHED (game over): stop.
-	# (If no GameState — e.g. unit tests — just run.)
-	if not _gs_running():
-		velocity.x = 0.0
-		velocity.z = 0.0
-		if not is_on_floor():
-			velocity.y -= 22.0 * delta
-		move_and_slide()
-		return
 	if _touch_active:
 		_touch_time += delta
 	if _adhere_cooldown > 0.0:
@@ -243,20 +150,14 @@ func _physics_process(delta: float) -> void:
 		if _shield_timer <= 0.0:
 			shield_charges = 0
 			_shield_bubble.visible = false
-	# P19: speed boost expiry.
-	if _speed_boost_timer > 0.0:
-		_speed_boost_timer -= delta
-		if _speed_boost_timer <= 0.0:
-			_speed_boost_timer = 0.0
-			_speed_trail.visible = false
-	# P14: score = meters from the start line.
-	# P15: accumulate distance via add_score so near-miss bonuses persist.
-	var gs := _gs()
-	if gs != null:
-		var dist := maxi(0, int(_spawn_pos.z - global_position.z))
-		if dist > _last_dist:
-			gs.add_score(dist - _last_dist)
-			_last_dist = dist
+	# P10: while DEAD, just count down to respawn. No movement, no input.
+	if state == MoveState.DEAD:
+		_respawn_timer -= delta
+		# Squash flat for readable feedback.
+		scale.y = maxf(0.15, scale.y - delta * 5.0)
+		if _respawn_timer <= 0.0:
+			_respawn()
+		return
 	_update_state()
 	# P8: dash on Shift (or the mobile dash button). Only from RUN/AIR, and
 	# the cooldown prevents spam.
@@ -273,18 +174,13 @@ func _physics_process(delta: float) -> void:
 	match state:
 		MoveState.RUN, MoveState.AIR:
 			_apply_run_movement(delta)
-		MoveState.ADHERE_WALL, MoveState.ADHERE_CEILING:
+		MoveState.ADHERE_WALL:
 			_apply_adhere_movement(delta)
 		MoveState.DASH:
 			_apply_dash_movement(delta)
 		_:
-			pass # STUNNED, DEAD arrive in later prompts.
-	var was_air := state == MoveState.AIR # P22: captured before the move.
+			pass # ADHERE_CEILING, STUNNED, DEAD arrive in later prompts.
 	move_and_slide()
-	# P22: landing squash — airborne coming in, on the floor going out.
-	# (Takeoff sets AIR but leaves the floor the same frame, so no false hit.)
-	if was_air and is_on_floor() and state != MoveState.DEAD:
-		_juice_scale(1.25, 0.65)
 	# Track jump peak for the dev HUD: highest point above jump start.
 	if stat_jumps > 0 and not is_on_floor():
 		stat_last_peak = maxf(stat_last_peak, global_position.y - _jump_start_y)
@@ -349,12 +245,8 @@ func _attach_to_wall(normal: Vector3) -> void:
 ## P5: while adhered, just stick. P6: remap controls to the wall — "forward"
 ## (auto) climbs the surface, steering moves across it. A gentle press into
 ## the surface keeps it counting as floor. If the surface ends, let go.
-## P20: while on a wall, also watch for a climbable ceiling overhead —
-## grabbing the pergola slab's underside is the gecko fantasy.
 func _apply_adhere_movement(delta: float) -> void:
 	_adhere_grace -= delta
-	if state == MoveState.ADHERE_WALL and _try_ceiling_transition():
-		return
 	if _adhere_grace <= 0.0 and not is_on_floor():
 		_detach_from_wall()
 		return
@@ -368,53 +260,6 @@ func _apply_adhere_movement(delta: float) -> void:
 	velocity = (up_wall * wall_run_speed
 		+ across * steer_input * steer_speed
 		- wall_normal * adhere_press_speed)
-
-
-## P20: stick to a ceiling (pergola slab underside). Same trick as walls:
-## point up_direction at the surface normal — here that's DOWN, so the
-## gecko hangs upside-down and the ceiling counts as floor.
-func _attach_to_ceiling(normal: Vector3) -> void:
-	state = MoveState.ADHERE_CEILING
-	stat_state = "ADHERE_CEILING"
-	wall_normal = normal.normalized()
-	up_direction = wall_normal
-	_adhere_grace = adhere_grace_time
-	# Keep the current heading, projected onto the ceiling plane. If the
-	# heading was straight up the wall (degenerate), fall back to down-track.
-	var fwd: Vector3 = -global_transform.basis.z
-	fwd = fwd - wall_normal * fwd.dot(wall_normal)
-	if fwd.length() < 0.05:
-		fwd = Vector3(0, 0, -1) - wall_normal * Vector3(0, 0, -1).dot(wall_normal)
-	if fwd.length() < 0.05:
-		fwd = Vector3(1, 0, 0) - wall_normal * Vector3(1, 0, 0).dot(wall_normal)
-	fwd = fwd.normalized()
-	var z_axis: Vector3 = -fwd
-	var x_axis: Vector3 = wall_normal.cross(z_axis).normalized()
-	global_transform.basis = Basis(x_axis, wall_normal, z_axis).orthonormalized()
-	velocity = -wall_normal * adhere_press_speed # Press UP into the ceiling.
-
-
-## P20: while wall-running, cast up-the-surface for a climbable ceiling.
-## The pergola posts are 2.4 m tall and meet the slab — climbing into it
-## feels like the gecko found a secret highway.
-func _try_ceiling_transition() -> bool:
-	var up_surface: Vector3 = -global_transform.basis.z
-	var space := get_world_3d().direct_space_state
-	var query := PhysicsRayQueryParameters3D.create(
-		global_position + up_surface * 0.2,
-		global_position + up_surface * 1.5)
-	query.exclude = [get_rid()]
-	var hit: Dictionary = space.intersect_ray(query)
-	if hit.is_empty():
-		return false
-	var collider: Object = hit.get("collider")
-	if not (collider is Node and (collider as Node).is_in_group("climbable")):
-		return false
-	var n: Vector3 = hit.get("normal")
-	if n.y > -0.5: # Walls are y≈0, floors y≈+1 — we want ceiling-like (y≈-1).
-		return false
-	_attach_to_ceiling(n)
-	return true
 
 
 ## Any exit from the wall restores world-up so gravity and floor detection
@@ -456,27 +301,8 @@ func die() -> void:
 	state = MoveState.DEAD
 	stat_state = "DEAD"
 	stat_deaths += 1
-	# P22: the camera feels it — full trauma shake on death.
-	var rig := get_tree().get_first_node_in_group("camera_rig")
-	if rig != null and rig.has_method("add_trauma"):
-		rig.add_trauma(1.0)
-	var gs := _gs()
-	if gs != null and gs.has_method("register_death"):
-		# P22 fix: deaths route through register_death() so the combo breaks.
-		# (The old gs.deaths += 1 never reset the combo.)
-		gs.register_death()
-		if gs.deaths >= gs.max_lives:
-			# P14: out of lives. No respawn — the game-over screen takes it.
-			gs.finish_run()
-			return
 	_respawn_timer = 0.8
 	velocity = Vector3.ZERO
-
-
-## P14: full reset for "RUN AGAIN" — back to the start line, fresh lives.
-func reset_for_new_run() -> void:
-	_respawn()
-	stat_deaths = 0
 
 
 ## P12: grant one shield charge (10 s expiry). Called by shield pickups.
@@ -484,33 +310,6 @@ func give_shield() -> void:
 	shield_charges = 1
 	_shield_timer = 10.0
 	_shield_bubble.visible = true
-
-
-## P19: grant the speed boost (6 s of 1.5x). Called by speed pickups.
-func give_speed_boost() -> void:
-	_speed_boost_timer = SPEED_BOOST_DURATION
-	_speed_trail.visible = true
-
-
-## P19: current speed multiplier — 1.5 while boosted, 1.0 otherwise.
-func boost_multiplier() -> float:
-	return SPEED_BOOST_MULT if _speed_boost_timer > 0.0 else 1.0
-
-
-## P19: the motion-streak that sells the boost.
-func _build_speed_trail() -> void:
-	_speed_trail = MeshInstance3D.new()
-	var trail_mesh := BoxMesh.new()
-	trail_mesh.size = Vector3(0.5, 0.4, 1.8)
-	_speed_trail.mesh = trail_mesh
-	var trail_mat := StandardMaterial3D.new()
-	trail_mat.albedo_color = Color(1.0, 0.6, 0.15, 0.35)
-	trail_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	trail_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_speed_trail.material_override = trail_mat
-	_speed_trail.position = Vector3(0, 0.35, 0.9)
-	_speed_trail.visible = false
-	add_child(_speed_trail)
 
 
 ## P12: the translucent bubble that says "you're protected."
@@ -536,12 +335,8 @@ func _respawn() -> void:
 	global_position = _spawn_pos
 	velocity = Vector3.ZERO
 	up_direction = Vector3.UP
-	_last_dist = 0 ## P15: distance re-accumulates from the respawn point.
 	_reset_upright_basis()
 	scale = Vector3.ONE
-	_visual.scale = Vector3.ONE * VISUAL_BASE_SCALE ## P22: clear squash/stretch.
-	if _squash_tween != null and _squash_tween.is_valid():
-		_squash_tween.kill()
 	state = MoveState.RUN
 	stat_state = "RUN"
 	_adhere_cooldown = 0.0
@@ -550,12 +345,6 @@ func _respawn() -> void:
 	shield_charges = 0
 	_shield_timer = 0.0
 	_shield_bubble.visible = false
-	_speed_boost_timer = 0.0 ## P19: boost does not survive death.
-	_speed_trail.visible = false
-	# P22: register_death() parked GameState in DEAD — the run resumes here.
-	var gs := _gs()
-	if gs != null and gs.has_method("respawn"):
-		gs.respawn()
 
 
 ## P8: the mobile dash button calls this (keyboard uses the "dash" action).
@@ -567,7 +356,6 @@ func request_dash() -> void:
 ## a valid jump window overlap. Runs BEFORE movement so the jump velocity is
 ## picked up by _apply_run_movement() in the same frame (no 1-frame delay).
 func _update_jump_timers(delta: float) -> void:
-## picked up by _apply_run_movement() in the same frame (no 1-frame delay).
 	if is_on_floor():
 		_coyote_timer = coyote_time
 	else:
@@ -578,21 +366,6 @@ func _update_jump_timers(delta: float) -> void:
 		_buffer_timer -= delta
 	if _buffer_timer > 0.0 and _coyote_timer > 0.0:
 		_do_jump()
-
-
-## P22: squash & stretch, visual-only. Snaps the visual to (width, height),
-## then a BACK-eased tween settles it to normal over 0.22 s — the classic
-## cartoon "boing" without touching the hitbox.
-## P23: the hero is rotated 90° about Y, so local Y is up and local Z is
-## lateral: height squashes local Y, width widens local Z. The base scale
-## (0.85) is preserved through the juice.
-func _juice_scale(width: float, height: float) -> void:
-	if _squash_tween != null and _squash_tween.is_valid():
-		_squash_tween.kill()
-	_visual.scale = Vector3(1.0, height, width) * VISUAL_BASE_SCALE
-	_squash_tween = create_tween()
-	_squash_tween.tween_property(_visual, "scale", Vector3.ONE * VISUAL_BASE_SCALE, 0.22)\
-		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func _do_jump() -> void:
@@ -606,17 +379,8 @@ func _do_jump() -> void:
 		up_direction = Vector3.UP
 		_adhere_cooldown = adhere_cooldown
 		_kick_timer = 0.35
-		_juice_scale(0.85, 1.3) ## P22: stretch on the kick.
-	elif state == MoveState.ADHERE_CEILING:
-		# P20: dropping off the ceiling. Small downward push, keep some
-		# horizontal momentum, fall back to the ground.
-		_reset_upright_basis()
-		up_direction = Vector3.UP
-		_adhere_cooldown = adhere_cooldown
-		velocity = Vector3(velocity.x * 0.3, -2.0, velocity.z * 0.3)
 	else:
 		velocity.y = jump_velocity
-		_juice_scale(0.85, 1.3) ## P22: stretch on takeoff.
 	_buffer_timer = 0.0 # Consume both so one press = one jump.
 	_coyote_timer = 0.0
 	state = MoveState.AIR
@@ -646,16 +410,10 @@ func _apply_run_movement(delta: float) -> void:
 	# 2. Auto-forward: constant speed, always -Z. The player never controls this.
 	# P7: right after a wall kick the shove-off momentum is preserved and
 	# eased back into the auto-run, so the kick visibly arcs off the wall.
-	# P16: speed ramps with run time (the "one more run" tension).
-	var gs2 := _gs()
-	var effective_speed: float = run_speed
-	if gs2 != null:
-		effective_speed = minf(run_speed + gs2.run_time * speed_ramp, max_speed)
-	effective_speed *= boost_multiplier() ## P19: 1.5x while boosted.
 	if _kick_timer > 0.0:
-		velocity.z = move_toward(velocity.z, -effective_speed, 30.0 * delta)
+		velocity.z = move_toward(velocity.z, -run_speed, 30.0 * delta)
 	else:
-		velocity.z = -effective_speed
+		velocity.z = -run_speed
 
 	# 3. Gravity: keeps the gecko planted; lets it leave the ground when jumping.
 	if not is_on_floor():

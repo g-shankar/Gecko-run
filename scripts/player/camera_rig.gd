@@ -30,16 +30,8 @@ extends Node3D
 ## wall normal while the gecko is adhered so the wall reads as "ground".
 var _bank_up := Vector3.UP
 
-## P22: trauma-based shake. Death hits 1.0, a near-miss 0.35. Trauma decays
-## linearly but the shake scales with trauma^2, so big hits punch hard and
-## settle fast instead of wobbling forever.
-var _trauma := 0.0
-const SHAKE_DECAY := 1.6
-const SHAKE_MAX_ANGLE := 0.12 ## Radians of jitter at full trauma.
-
 
 func _ready() -> void:
-	add_to_group("camera_rig") ## P22: the gecko/GameState find the rig here.
 	# Auto-discover the gecko when no explicit target was assigned.
 	# (A NodePath override written on an instanced scene does not reliably
 	# resolve in Godot 4, so the gecko registers itself in the "gecko"
@@ -79,24 +71,8 @@ func _process(delta: float) -> void:
 		- basis.z * look_ahead
 		+ basis.y * look_height)
 	_camera.look_at(aim, _bank_up)
-	# P22: trauma shake. Applied as a post-aim jitter so it never fights the
-	# follow logic or the SpringArm.
-	_trauma = maxf(0.0, _trauma - SHAKE_DECAY * delta)
-	if _trauma > 0.0:
-		var s: float = _trauma * _trauma * SHAKE_MAX_ANGLE
-		_camera.rotation.x += randf_range(-s, s)
-		_camera.rotation.y += randf_range(-s, s)
-		_camera.rotation.z += randf_range(-s, s) * 0.5
 	# P8: FOV kick on dash (70 -> 82). Eased, so it punches in and relaxes out.
 	var fov_target := 70.0
 	if target.get("stat_state") == "DASH":
 		fov_target = 82.0
-	elif float(target.get("_speed_boost_timer") or 0.0) > 0.0:
-		fov_target = 78.0 ## P19: milder kick for the speed boost.
 	_camera.fov = lerpf(_camera.fov, fov_target, 1.0 - exp(-10.0 * delta))
-
-
-## P22: add camera shake trauma (0..1, clamped). Death calls with 1.0,
-## near-miss with 0.35.
-func add_trauma(amount: float) -> void:
-	_trauma = clampf(_trauma + amount, 0.0, 1.0)
