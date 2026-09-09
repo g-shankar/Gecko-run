@@ -85,6 +85,10 @@ var stat_deaths: int = 0 ## P10: times squashed.
 var shield_charges: int = 0 ## P12: hits the shield can still absorb.
 var _shield_timer: float = 0.0 ## P12: shield expiry countdown.
 var _shield_bubble: MeshInstance3D ## P12: the visible bubble.
+var _speed_boost_timer: float = 0.0 ## P19: seconds of 1.5x speed left.
+var _speed_trail: MeshInstance3D ## P19: motion-streak visual during boost.
+const SPEED_BOOST_DURATION: float = 6.0 ## P19: boost length (s).
+const SPEED_BOOST_MULT: float = 1.5 ## P19: speed multiplier while boosted.
 var _spawn_pos: Vector3 ## P10: where a respawn puts you.
 var _last_dist: int = 0 ## P15: last distance banked into the score.
 var _respawn_timer: float = 0.0 ## P10: countdown while DEAD.
@@ -112,6 +116,7 @@ func _ready() -> void:
 	_spawn_pos = global_position
 	_last_dist = 0
 	_build_shield_bubble()
+	_build_speed_trail() ## P19.
 	# The feeler rays must ignore the gecko's own body, and their length
 	# follows the exported tuning (the .tscn value is only a default).
 	for ray: RayCast3D in [_wall_ray_l, _wall_ray_r]:
@@ -175,6 +180,12 @@ func _physics_process(delta: float) -> void:
 		if _shield_timer <= 0.0:
 			shield_charges = 0
 			_shield_bubble.visible = false
+	# P19: speed boost expiry.
+	if _speed_boost_timer > 0.0:
+		_speed_boost_timer -= delta
+		if _speed_boost_timer <= 0.0:
+			_speed_boost_timer = 0.0
+			_speed_trail.visible = false
 	# P14: score = meters from the start line.
 	# P15: accumulate distance via add_score so near-miss bonuses persist.
 	var gs := _gs()
@@ -358,6 +369,33 @@ func give_shield() -> void:
 	_shield_bubble.visible = true
 
 
+## P19: grant the speed boost (6 s of 1.5x). Called by speed pickups.
+func give_speed_boost() -> void:
+	_speed_boost_timer = SPEED_BOOST_DURATION
+	_speed_trail.visible = true
+
+
+## P19: current speed multiplier — 1.5 while boosted, 1.0 otherwise.
+func boost_multiplier() -> float:
+	return SPEED_BOOST_MULT if _speed_boost_timer > 0.0 else 1.0
+
+
+## P19: the motion-streak that sells the boost.
+func _build_speed_trail() -> void:
+	_speed_trail = MeshInstance3D.new()
+	var trail_mesh := BoxMesh.new()
+	trail_mesh.size = Vector3(0.5, 0.4, 1.8)
+	_speed_trail.mesh = trail_mesh
+	var trail_mat := StandardMaterial3D.new()
+	trail_mat.albedo_color = Color(1.0, 0.6, 0.15, 0.35)
+	trail_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	trail_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_speed_trail.material_override = trail_mat
+	_speed_trail.position = Vector3(0, 0.35, 0.9)
+	_speed_trail.visible = false
+	add_child(_speed_trail)
+
+
 ## P12: the translucent bubble that says "you're protected."
 func _build_shield_bubble() -> void:
 	_shield_bubble = MeshInstance3D.new()
@@ -392,6 +430,8 @@ func _respawn() -> void:
 	shield_charges = 0
 	_shield_timer = 0.0
 	_shield_bubble.visible = false
+	_speed_boost_timer = 0.0 ## P19: boost does not survive death.
+	_speed_trail.visible = false
 
 
 ## P8: the mobile dash button calls this (keyboard uses the "dash" action).
@@ -462,6 +502,7 @@ func _apply_run_movement(delta: float) -> void:
 	var effective_speed: float = run_speed
 	if gs2 != null:
 		effective_speed = minf(run_speed + gs2.run_time * speed_ramp, max_speed)
+	effective_speed *= boost_multiplier() ## P19: 1.5x while boosted.
 	if _kick_timer > 0.0:
 		velocity.z = move_toward(velocity.z, -effective_speed, 30.0 * delta)
 	else:
