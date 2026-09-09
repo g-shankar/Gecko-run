@@ -23,6 +23,8 @@ var _game_over: Control
 var _score_label: Label
 var _lives_label: Label
 var _shield_label: Label
+var _near_miss_label: Label ## P15: "NEAR MISS +50!" popup.
+var _near_miss_timer: float = 0.0
 var _final_score_label: Label
 var _best_label: Label
 
@@ -43,6 +45,7 @@ func _ready() -> void:
 	gs.state_changed.connect(_on_state_changed)
 	gs.score_changed.connect(_on_score_changed)
 	gs.deaths_changed.connect(_on_deaths_changed)
+	gs.near_misses_changed.connect(_on_near_miss)
 
 
 func _on_state_changed(new_state: int) -> void:
@@ -65,11 +68,24 @@ func _on_deaths_changed(new_count: int) -> void:
 	_lives_label.text = "Lives: %d" % maxi(left, 0)
 
 
-func _process(_delta: float) -> void:
+## P15: flash "NEAR MISS +50!" center-screen. The juice.
+func _on_near_miss(_new_count: int) -> void:
+	_near_miss_label.visible = true
+	_near_miss_label.modulate.a = 1.0
+	_near_miss_timer = 1.2
+
+
+func _process(delta: float) -> void:
 	# Shield indicator follows the gecko.
 	var gecko := get_tree().get_first_node_in_group("gecko")
 	if gecko != null:
 		_shield_label.visible = int(gecko.get("shield_charges")) > 0
+	# P15: near-miss popup fades out.
+	if _near_miss_timer > 0.0:
+		_near_miss_timer -= delta
+		_near_miss_label.modulate.a = clampf(_near_miss_timer / 1.2, 0.0, 1.0)
+		if _near_miss_timer <= 0.0:
+			_near_miss_label.visible = false
 
 
 func _show_only(panel: Control) -> void:
@@ -157,6 +173,15 @@ func _build_hud() -> void:
 	pause_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	pause_btn.pressed.connect(_on_pause_pressed)
 	_hud.add_child(pause_btn)
+	# P15: near-miss popup, center-screen. Hidden until earned.
+	_near_miss_label = _make_label("NEAR MISS +50!", 48)
+	_near_miss_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+	_near_miss_label.set_anchors_preset(Control.PRESET_CENTER)
+	_near_miss_label.position = Vector2(-200, -60)
+	_near_miss_label.size = Vector2(400, 80)
+	_near_miss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_near_miss_label.visible = false
+	_hud.add_child(_near_miss_label)
 
 
 func _on_pause_pressed() -> void:

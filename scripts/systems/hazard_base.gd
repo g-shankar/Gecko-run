@@ -21,6 +21,7 @@ enum Phase { IDLE, TELEGRAPH, ACTIVE, RECOVERY }
 
 signal player_hit
 signal phase_changed(new_phase: int)
+signal near_miss ## P15: gecko was close during ACTIVE but survived.
 
 @export var idle_time: float = 1.5 ## Breather between attacks (s).
 @export var warn_time: float = 0.8 ## Telegraph duration — the dodge window (s).
@@ -29,10 +30,13 @@ signal phase_changed(new_phase: int)
 @export var one_shot: bool = false ## If true, stop after one RECOVERY.
 @export var hits_always: bool = false ## If true, the hitbox is live in every
 ## phase (e.g. a parked car is still a car). Otherwise only during ACTIVE.
+@export var near_miss_distance: float = 2.5 ## P15: how close (m) counts as
+## a near-miss if the gecko survives the ACTIVE phase.
 
 var phase: int = Phase.IDLE
 var _phase_timer: float = 0.0
 var _finished: bool = false
+var _was_close: bool = false ## P15: gecko entered near-miss range during ACTIVE.
 
 
 func _ready() -> void:
@@ -42,6 +46,10 @@ func _ready() -> void:
 	var gecko := get_tree().get_first_node_in_group("gecko")
 	if gecko != null and gecko.has_method("die"):
 		player_hit.connect(gecko.die)
+	# P15: near-misses feed the score via GameState.
+	var gs := get_tree().root.get_node_or_null("GameState")
+	if gs != null and gs.has_method("register_near_miss"):
+		near_miss.connect(gs.register_near_miss)
 	_enter_phase(Phase.IDLE)
 
 
@@ -50,6 +58,11 @@ func _physics_process(delta: float) -> void:
 		return
 	_phase_timer -= delta
 	_tick_phase(delta)
+	# P15: during ACTIVE, note if the gecko gets within near-miss range.
+	if phase == Phase.ACTIVE and not _was_close:
+		var gecko := get_tree().get_first_node_in_group("gecko") as Node3D
+		if gecko != null and gecko.global_position.distance_to(global_position) < near_miss_distance:
+			_was_close = true
 	if _phase_timer <= 0.0:
 		_advance()
 
@@ -61,6 +74,7 @@ func _advance() -> void:
 		Phase.TELEGRAPH:
 			_enter_phase(Phase.ACTIVE)
 		Phase.ACTIVE:
+			_check_near_miss() # P15: survived it close? That's points.
 			_enter_phase(Phase.RECOVERY)
 		Phase.RECOVERY:
 			if one_shot:
@@ -86,6 +100,19 @@ func _enter_phase(p: int) -> void:
 		Phase.RECOVERY:
 			_phase_timer = recovery_time
 			_on_recover()
+
+
+## P15: called when ACTIVE ends. If the gecko was close but the run is
+## still going (it survived), that's a near-miss: emit for GameState.
+func _check_near_miss() -> void:
+	var close: bool = _was_close
+	_was_close = false
+	if not close:
+		return
+	var gs := get_tree().root.get_node_or_null("GameState")
+	# State.RUNNING == 1. If the gecko died, we're DEAD/FINISHED: no points.
+	if gs != null and int(gs.get("current_state")) == 1:
+		near_miss.emit()
 
 
 ## Per-frame hook so subclasses can animate (shadow growing, shoe slamming).
