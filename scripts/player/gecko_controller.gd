@@ -218,12 +218,12 @@ func _physics_process(delta: float) -> void:
 	match state:
 		MoveState.RUN, MoveState.AIR:
 			_apply_run_movement(delta)
-		MoveState.ADHERE_WALL:
+		MoveState.ADHERE_WALL, MoveState.ADHERE_CEILING:
 			_apply_adhere_movement(delta)
 		MoveState.DASH:
 			_apply_dash_movement(delta)
 		_:
-			pass # ADHERE_CEILING, STUNNED, DEAD arrive in later prompts.
+			pass # STUNNED, DEAD arrive in later prompts.
 	move_and_slide()
 	# Track jump peak for the dev HUD: highest point above jump start.
 	if stat_jumps > 0 and not is_on_floor():
@@ -289,8 +289,12 @@ func _attach_to_wall(normal: Vector3) -> void:
 ## P5: while adhered, just stick. P6: remap controls to the wall — "forward"
 ## (auto) climbs the surface, steering moves across it. A gentle press into
 ## the surface keeps it counting as floor. If the surface ends, let go.
+## P20: while on a wall, also watch for a climbable ceiling overhead —
+## grabbing the pergola slab's underside is the gecko fantasy.
 func _apply_adhere_movement(delta: float) -> void:
 	_adhere_grace -= delta
+	if state == MoveState.ADHERE_WALL and _try_ceiling_transition():
+		return
 	if _adhere_grace <= 0.0 and not is_on_floor():
 		_detach_from_wall()
 		return
@@ -304,6 +308,53 @@ func _apply_adhere_movement(delta: float) -> void:
 	velocity = (up_wall * wall_run_speed
 		+ across * steer_input * steer_speed
 		- wall_normal * adhere_press_speed)
+
+
+## P20: stick to a ceiling (pergola slab underside). Same trick as walls:
+## point up_direction at the surface normal — here that's DOWN, so the
+## gecko hangs upside-down and the ceiling counts as floor.
+func _attach_to_ceiling(normal: Vector3) -> void:
+	state = MoveState.ADHERE_CEILING
+	stat_state = "ADHERE_CEILING"
+	wall_normal = normal.normalized()
+	up_direction = wall_normal
+	_adhere_grace = adhere_grace_time
+	# Keep the current heading, projected onto the ceiling plane. If the
+	# heading was straight up the wall (degenerate), fall back to down-track.
+	var fwd: Vector3 = -global_transform.basis.z
+	fwd = fwd - wall_normal * fwd.dot(wall_normal)
+	if fwd.length() < 0.05:
+		fwd = Vector3(0, 0, -1) - wall_normal * Vector3(0, 0, -1).dot(wall_normal)
+	if fwd.length() < 0.05:
+		fwd = Vector3(1, 0, 0) - wall_normal * Vector3(1, 0, 0).dot(wall_normal)
+	fwd = fwd.normalized()
+	var z_axis: Vector3 = -fwd
+	var x_axis: Vector3 = wall_normal.cross(z_axis).normalized()
+	global_transform.basis = Basis(x_axis, wall_normal, z_axis).orthonormalized()
+	velocity = -wall_normal * adhere_press_speed # Press UP into the ceiling.
+
+
+## P20: while wall-running, cast up-the-surface for a climbable ceiling.
+## The pergola posts are 2.4 m tall and meet the slab — climbing into it
+## feels like the gecko found a secret highway.
+func _try_ceiling_transition() -> bool:
+	var up_surface: Vector3 = -global_transform.basis.z
+	var space := get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(
+		global_position + up_surface * 0.2,
+		global_position + up_surface * 1.5)
+	query.exclude = [get_rid()]
+	var hit: Dictionary = space.intersect_ray(query)
+	if hit.is_empty():
+		return false
+	var collider: Object = hit.get("collider")
+	if not (collider is Node and (collider as Node).is_in_group("climbable")):
+		return false
+	var n: Vector3 = hit.get("normal")
+	if n.y > -0.5: # Walls are y≈0, floors y≈+1 — we want ceiling-like (y≈-1).
+		return false
+	_attach_to_ceiling(n)
+	return true
 
 
 ## Any exit from the wall restores world-up so gravity and floor detection
@@ -466,6 +517,13 @@ func _do_jump() -> void:
 		up_direction = Vector3.UP
 		_adhere_cooldown = adhere_cooldown
 		_kick_timer = 0.35
+	elif state == MoveState.ADHERE_CEILING:
+		# P20: dropping off the ceiling. Small downward push, keep some
+		# horizontal momentum, fall back to the ground.
+		_reset_upright_basis()
+		up_direction = Vector3.UP
+		_adhere_cooldown = adhere_cooldown
+		velocity = Vector3(velocity.x * 0.3, -2.0, velocity.z * 0.3)
 	else:
 		velocity.y = jump_velocity
 	_buffer_timer = 0.0 # Consume both so one press = one jump.

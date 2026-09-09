@@ -29,6 +29,11 @@ const HAZARD_NAMES := {
 	"bug": "Bug",
 }
 
+## P20: the pergola — the gecko-fantasy ceiling route. Two climbable posts
+## hold a climbable slab; wall-running to a post top transitions onto the
+## slab's underside (see gecko_controller._try_ceiling_transition).
+const PERGOLA_Z := -16.0
+
 @export var level_data: Resource ## A LevelData (level_data.gd). Null = default route.
 
 var spawned: Array[Node3D] = [] ## Every hazard/pickup this level created.
@@ -42,6 +47,44 @@ func _ready() -> void:
 	_build_start_line()
 	for spawn in (level_data.get("spawns") as Array):
 		_spawn_hazard(spawn)
+	_build_ceiling_route() ## P20: pergola with the climbable ceiling.
+
+
+## P20: build the pergola — posts you climb, a slab underside you run on.
+func _build_ceiling_route() -> void:
+	var pergola := Node3D.new()
+	pergola.name = "Pergola"
+	add_child(pergola)
+	var wood := StandardMaterial3D.new()
+	wood.albedo_color = Color(0.45, 0.3, 0.18)
+	wood.roughness = 0.9
+	pergola.add_child(_make_climbable_box(
+		Vector3(0.4, 2.4, 0.4), Vector3(-2.2, 1.2, PERGOLA_Z), wood, "PergolaPostL"))
+	pergola.add_child(_make_climbable_box(
+		Vector3(0.4, 2.4, 0.4), Vector3(2.2, 1.2, PERGOLA_Z), wood, "PergolaPostR"))
+	pergola.add_child(_make_climbable_box(
+		Vector3(6.0, 0.3, 5.0), Vector3(0, 2.55, PERGOLA_Z), wood, "PergolaTop"))
+
+
+## P20: a climbable StaticBody3D box (collision + mesh). The "climbable"
+## group is what the gecko's feeler rays look for.
+func _make_climbable_box(size: Vector3, pos: Vector3, mat: Material, box_name: String) -> StaticBody3D:
+	var body := StaticBody3D.new()
+	body.name = box_name
+	body.add_to_group("climbable")
+	body.position = pos
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = size
+	shape.shape = box
+	body.add_child(shape)
+	var mesh := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = size
+	bm.material = mat
+	mesh.mesh = bm
+	body.add_child(mesh)
+	return body
 
 
 func _spawn_hazard(spawn: Dictionary) -> void:
