@@ -97,8 +97,13 @@ func _initialize() -> void:
 	if not sprinkler.near_miss.is_connected(gs2.register_near_miss):
 		sprinkler.near_miss.connect(gs2.register_near_miss)
 	# Park gecko within near-miss range (2.5m) but outside the hit zone.
-	# Sprinkler at (-1.5, 0, -8), fan extends -Z. Put gecko to the side.
-	gecko.global_position = Vector3(0.0, 0, -8.0) # 1.5m from sprinkler.
+	# Sprinkler at (-1.5, 0, -8), fan extends -Z with a 70-degree sweep: the
+	# kill box spans x -4.1..1.1, z -12.3..-7.7. Two meters behind it (-6.0)
+	# is close (2.0m) but clear of the fan — and clear of the footstep at
+	# (0, 0, -6), whose shoe only spans x +-0.8.
+	# (P22: the old spot (0,0,-8) was INSIDE the fan; the near-miss only
+	# counted because the old die() never set GameState to DEAD.)
+	gecko.global_position = Vector3(-1.5, 0, -6.0)
 	var score_before: int = gs2.score
 	# Wait for ACTIVE to complete (RECOVERY means ACTIVE just ended).
 	check(await wait_for_phase(sprinkler, 2, 5.0), "sprinkler ACTIVE for near-miss test")

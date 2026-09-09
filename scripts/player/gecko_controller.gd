@@ -107,6 +107,12 @@ var _dash_timer: float = 0.0 ## P8: time left in the current dash.
 var _dash_cooldown: float = 0.0 ## P8: time until dash is available again.
 var _dash_requested: bool = false ## P8: set by the mobile dash button.
 
+## P22: squash & stretch target the VISUAL only — the CollisionShape3D (the
+## hitbox) is a sibling, so it never pulses. The visual is rotated 90° about
+## X, so its local Z is the gecko's up.
+@onready var _visual: MeshInstance3D = $MeshInstance3D
+var _squash_tween: Tween ## P22: the active scale-recovery tween, if any.
+
 @onready var _wall_ray_l: RayCast3D = $WallRayL
 @onready var _wall_ray_r: RayCast3D = $WallRayR
 
@@ -156,6 +162,18 @@ func _input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# P10: while DEAD, just count down to respawn. No movement, no input.
+	# P22: this runs BEFORE the _gs_running() gate — register_death() parks
+	# GameState in DEAD, and the respawn is what brings the run back. The
+	# game-over path never arms the timer, so it can't respawn from there.
+	if state == MoveState.DEAD:
+		if _respawn_timer > 0.0:
+			_respawn_timer -= delta
+			# Squash flat for readable feedback.
+			scale.y = maxf(0.15, scale.y - delta * 5.0)
+			if _respawn_timer <= 0.0:
+				_respawn()
+		return
 	# P14: the run only moves when the GameState says RUNNING.
 	# READY (start screen): idle in place. FINISHED (game over): stop.
 	# (If no GameState — e.g. unit tests — just run.)
@@ -194,14 +212,6 @@ func _physics_process(delta: float) -> void:
 		if dist > _last_dist:
 			gs.add_score(dist - _last_dist)
 			_last_dist = dist
-	# P10: while DEAD, just count down to respawn. No movement, no input.
-	if state == MoveState.DEAD:
-		_respawn_timer -= delta
-		# Squash flat for readable feedback.
-		scale.y = maxf(0.15, scale.y - delta * 5.0)
-		if _respawn_timer <= 0.0:
-			_respawn()
-		return
 	_update_state()
 	# P8: dash on Shift (or the mobile dash button). Only from RUN/AIR, and
 	# the cooldown prevents spam.
@@ -224,7 +234,12 @@ func _physics_process(delta: float) -> void:
 			_apply_dash_movement(delta)
 		_:
 			pass # STUNNED, DEAD arrive in later prompts.
+	var was_air := state == MoveState.AIR # P22: captured before the move.
 	move_and_slide()
+	# P22: landing squash — airborne coming in, on the floor going out.
+	# (Takeoff sets AIR but leaves the floor the same frame, so no false hit.)
+	if was_air and is_on_floor() and state != MoveState.DEAD:
+		_juice_scale(1.25, 0.65)
 	# Track jump peak for the dev HUD: highest point above jump start.
 	if stat_jumps > 0 and not is_on_floor():
 		stat_last_peak = maxf(stat_last_peak, global_position.y - _jump_start_y)
@@ -396,9 +411,15 @@ func die() -> void:
 	state = MoveState.DEAD
 	stat_state = "DEAD"
 	stat_deaths += 1
+	# P22: the camera feels it — full trauma shake on death.
+	var rig := get_tree().get_first_node_in_group("camera_rig")
+	if rig != null and rig.has_method("add_trauma"):
+		rig.add_trauma(1.0)
 	var gs := _gs()
-	if gs != null:
-		gs.deaths += 1
+	if gs != null and gs.has_method("register_death"):
+		# P22 fix: deaths route through register_death() so the combo breaks.
+		# (The old gs.deaths += 1 never reset the combo.)
+		gs.register_death()
 		if gs.deaths >= gs.max_lives:
 			# P14: out of lives. No respawn — the game-over screen takes it.
 			gs.finish_run()
@@ -473,6 +494,9 @@ func _respawn() -> void:
 	_last_dist = 0 ## P15: distance re-accumulates from the respawn point.
 	_reset_upright_basis()
 	scale = Vector3.ONE
+	_visual.scale = Vector3.ONE ## P22: clear any squash/stretch.
+	if _squash_tween != null and _squash_tween.is_valid():
+		_squash_tween.kill()
 	state = MoveState.RUN
 	stat_state = "RUN"
 	_adhere_cooldown = 0.0
@@ -483,6 +507,10 @@ func _respawn() -> void:
 	_shield_bubble.visible = false
 	_speed_boost_timer = 0.0 ## P19: boost does not survive death.
 	_speed_trail.visible = false
+	# P22: register_death() parked GameState in DEAD — the run resumes here.
+	var gs := _gs()
+	if gs != null and gs.has_method("respawn"):
+		gs.respawn()
 
 
 ## P8: the mobile dash button calls this (keyboard uses the "dash" action).
@@ -494,6 +522,7 @@ func request_dash() -> void:
 ## a valid jump window overlap. Runs BEFORE movement so the jump velocity is
 ## picked up by _apply_run_movement() in the same frame (no 1-frame delay).
 func _update_jump_timers(delta: float) -> void:
+## picked up by _apply_run_movement() in the same frame (no 1-frame delay).
 	if is_on_floor():
 		_coyote_timer = coyote_time
 	else:
@@ -504,6 +533,18 @@ func _update_jump_timers(delta: float) -> void:
 		_buffer_timer -= delta
 	if _buffer_timer > 0.0 and _coyote_timer > 0.0:
 		_do_jump()
+
+
+## P22: squash & stretch, visual-only. Snaps the visual to (width, height),
+## then a BACK-eased tween settles it to normal over 0.22 s — the classic
+## cartoon "boing" without touching the hitbox.
+func _juice_scale(width: float, height: float) -> void:
+	if _squash_tween != null and _squash_tween.is_valid():
+		_squash_tween.kill()
+	_visual.scale = Vector3(width, 1.0, height)
+	_squash_tween = create_tween()
+	_squash_tween.tween_property(_visual, "scale", Vector3.ONE, 0.22)\
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func _do_jump() -> void:
@@ -517,6 +558,7 @@ func _do_jump() -> void:
 		up_direction = Vector3.UP
 		_adhere_cooldown = adhere_cooldown
 		_kick_timer = 0.35
+		_juice_scale(0.85, 1.3) ## P22: stretch on the kick.
 	elif state == MoveState.ADHERE_CEILING:
 		# P20: dropping off the ceiling. Small downward push, keep some
 		# horizontal momentum, fall back to the ground.
@@ -526,6 +568,7 @@ func _do_jump() -> void:
 		velocity = Vector3(velocity.x * 0.3, -2.0, velocity.z * 0.3)
 	else:
 		velocity.y = jump_velocity
+		_juice_scale(0.85, 1.3) ## P22: stretch on takeoff.
 	_buffer_timer = 0.0 # Consume both so one press = one jump.
 	_coyote_timer = 0.0
 	state = MoveState.AIR

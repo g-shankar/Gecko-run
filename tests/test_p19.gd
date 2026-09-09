@@ -76,11 +76,11 @@ func _initialize() -> void:
 	check(ratio > 1.35 and ratio < 1.65,
 		"boosted distance ~1.5x plain (ratio=%.2f)" % ratio)
 
-	# --- 4: expiry ---
+	# --- 4: expiry (physics frames: the timer ticks on physics delta) ---
 	gecko.call("give_speed_boost")
 	gecko.set("_speed_boost_timer", 0.05)
 	for i in 10:
-		await process_frame
+		await physics_frame
 	check(absf(float(gecko.call("boost_multiplier")) - 1.0) < 0.01,
 		"multiplier back to 1.0 after expiry")
 	check(not bool((gecko.get("_speed_trail") as MeshInstance3D).visible),
@@ -112,7 +112,7 @@ func _initialize() -> void:
 		check(speed_label.visible, "SPEED! shows while boosted")
 		gecko.set("_speed_boost_timer", 0.05)
 		for i in 10:
-			await process_frame
+			await physics_frame
 		check(not speed_label.visible, "SPEED! hides after expiry")
 
 	print("--- P19: %d passed, %d failed ---" % [_pass, _fail])

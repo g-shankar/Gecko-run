@@ -84,4 +84,5 @@ func _on_body_entered(body: Node3D) -> void:
 	var gs := get_tree().root.get_node_or_null("GameState")
 	if gs != null and gs.has_method("collect_bug"):
 		gs.collect_bug()
+	FX.burst(get_tree().root, global_position, Color(0.4, 1.0, 0.3)) ## P22: green pop.
 	queue_free()
