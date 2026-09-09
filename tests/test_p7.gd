@@ -27,11 +27,15 @@ func _run() -> void:
 	if _gs != null:
 		_gs.queue_free()
 	_gecko = scene.get_node("Gecko")
+	var level: Node3D = scene.get_node("Level")
 	# Park every hazard: these suites test wall movement, not dodging.
-	for hn in ["FootstepA", "FootstepB", "Bicycle", "BackingCar"]:
-		var hz: Area3D = scene.get_node("Level/" + hn)
-		hz.set_physics_process(false)
-		hz.position = Vector3(100, 0, 100)
+	for hz in level.get("spawned"):
+		(hz as Area3D).set_physics_process(false)
+		(hz as Node3D).position = Vector3(100, 0, 100)
+	# P21: the fence is the finish gate at the route's end — the gecko
+	# starts just before it instead of running the whole route.
+	var fence_z: float = float(level.get("level_data").get("fence_z"))
+	_gecko.global_position = Vector3(0, 0.2, fence_z + 10.0)
 	# Ride the wall up a little first (P6).
 	var adhered := false
 	for i in range(600):

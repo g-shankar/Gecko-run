@@ -49,10 +49,13 @@ func _run() -> void:
 			break
 	_check("bicycle crosses the track during ACTIVE", crossed)
 	# Bicycle kill: freeze it mid-crossing, put the gecko on it.
+	# P21: the long route may leave the gecko mid death/respawn — reset first.
+	# The bike's kill zone sits at its lane (z=-11); park the gecko inside it.
+	_gecko.call("_respawn")
 	bike._enter_phase(2)
 	bike.set_physics_process(false)
 	bike.position.x = 0.0
-	_gecko.global_position = Vector3(0, 0.2, -9)
+	_gecko.global_position = Vector3(0, 0.2, -10.8)
 	await physics_frame # Let the physics server register the overlap.
 	bike._check_overlaps()
 	for i in range(10):

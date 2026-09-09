@@ -8,6 +8,7 @@ extends SceneTree
 
 var _gecko: Node
 var _checks: Array = []
+var _fence_z: float = -20.0
 
 
 func _init() -> void:
@@ -30,11 +31,15 @@ func _run() -> void:
 	if _gs != null:
 		_gs.queue_free()
 	_gecko = scene.get_node("Gecko")
+	var level: Node3D = scene.get_node("Level")
 	# Park every hazard: these suites test wall movement, not dodging.
-	for hn in ["FootstepA", "FootstepB", "Bicycle", "BackingCar"]:
-		var hz: Area3D = scene.get_node("Level/" + hn)
-		hz.set_physics_process(false)
-		hz.position = Vector3(100, 0, 100)
+	for hz in level.get("spawned"):
+		(hz as Area3D).set_physics_process(false)
+		(hz as Node3D).position = Vector3(100, 0, 100)
+	# P21: the fence is the finish gate at the route's end — the gecko
+	# starts just before it instead of running the whole route.
+	_fence_z = float(level.get("level_data").get("fence_z"))
+	_gecko.global_position = Vector3(0, 0.2, _fence_z + 10.0)
 	# Let _ready() hooks run and the physics settle. The gecko spawns a hair
 	# above the ground, so give it up to a second to land and enter RUN.
 	var settled := false
@@ -68,8 +73,8 @@ func _report() -> void:
 	_check("wall_normal recorded", n.distance_to(Vector3(0.0, 0.0, 1.0)) < 0.05)
 	_check("capsule reoriented upright on wall (basis.y ~= 0,0,1)",
 			basis_y.distance_to(Vector3(0.0, 0.0, 1.0)) < 0.05)
-	_check("gecko parked at the wall face (z < -18)", pos.z < -18.0)
-	_check("gecko did not tunnel through (z > -20.5)", pos.z > -20.5)
+	_check("gecko parked at the wall face", pos.z < _fence_z + 2.0)
+	_check("gecko did not tunnel through", pos.z > _fence_z - 0.5)
 	# NOTE: "still glued at end of run" is P6's territory now — the gecko
 	# climbs after attaching, so end-of-run state is covered by test_p6.
 	var failed := 0

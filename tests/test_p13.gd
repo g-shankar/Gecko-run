@@ -57,6 +57,8 @@ func _init() -> void:
 				found = true
 			elif (h as Node).name.begins_with("Bicycle") and absf(hp.z - want.z) < 0.05:
 				found = true # The bicycle crosses in x; its lane (z) is what matters.
+			elif (h as Node).name.begins_with("BackingCar") and absf(hp.z - want.z) < 0.05:
+				found = true # The car backs up in x; its lane (z) is what matters.
 			elif (h as Node).name.begins_with("Bug"):
 				# Bugs bob in Y; check XZ only.
 				var dx: float = hp.x - want.x
