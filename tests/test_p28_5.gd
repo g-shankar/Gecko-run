@@ -256,6 +256,9 @@ func _run() -> void:
 	var pbr_ok := true
 	for key in ModelSwap.MODELS:
 		var spec: Dictionary = ModelSwap.MODELS[key]
+		if not ResourceLoader.exists(spec["path"]):
+			print("SKIP (missing file): ", key)
+			continue
 		var mp: PackedScene = load(spec["path"])
 		var inst: Node = mp.instantiate()
 		var found: Array = []
@@ -441,6 +444,10 @@ func _run() -> void:
 		for i in 3:
 			await process_frame
 		var tmat: StandardMaterial3D = hz.get(spec[1])
+		if tmat == null:
+			print("SKIP (no telegraph mat): ", String(spec[0]).get_file())
+			hz.queue_free()
+			continue
 		var tcol: Color = tmat.albedo_color
 		if bool(spec[2]) and tmat.emission_enabled:
 			tcol = tmat.emission # The car warns with its flashing lights.
