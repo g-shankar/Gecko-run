@@ -67,7 +67,7 @@ func _on_state_changed(new_state: int) -> void:
 
 
 func _on_score_changed(new_score: int) -> void:
-	_score_label.text = "%d m" % new_score
+	_score_label.text = "SCORE %d" % new_score ## P22: points, not meters.
 
 
 func _on_deaths_changed(new_count: int) -> void:
@@ -75,8 +75,10 @@ func _on_deaths_changed(new_count: int) -> void:
 	_lives_label.text = "Lives: %d" % maxi(left, 0)
 
 
-## P15: flash "NEAR MISS +50!" center-screen. The juice.
+## P15: flash the near-miss popup center-screen. The juice.
+## P22: shows the ACTUAL award (50 x current combo), not a stale "+50!".
 func _on_near_miss(_new_count: int) -> void:
+	_near_miss_label.text = "NEAR MISS +%d!" % (50 * maxi(1, _gs().combo))
 	_near_miss_label.visible = true
 	_near_miss_label.modulate.a = 1.0
 	_near_miss_timer = 1.2
@@ -198,7 +200,7 @@ func _build_hud() -> void:
 	_full_rect(_hud)
 	_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_hud)
-	_score_label = _make_label("0 m", 40)
+	_score_label = _make_label("SCORE 0", 40)
 	_score_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	_score_label.position = Vector2(20, 16)
 	_hud.add_child(_score_label)
@@ -318,13 +320,13 @@ func _build_game_over() -> void:
 	title.size = Vector2(400, 90)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_game_over.add_child(title)
-	_final_score_label = _make_label("0 m", 40)
+	_final_score_label = _make_label("SCORE 0", 40)
 	_final_score_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	_final_score_label.position = Vector2(-200, 270)
 	_final_score_label.size = Vector2(400, 60)
 	_final_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_game_over.add_child(_final_score_label)
-	_best_label = _make_label("Best: 0 m", 28)
+	_best_label = _make_label("Best: 0 PTS", 28)
 	_best_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	_best_label.position = Vector2(-200, 330)
 	_best_label.size = Vector2(400, 40)
@@ -338,8 +340,8 @@ func _build_game_over() -> void:
 
 
 func _update_game_over() -> void:
-	_final_score_label.text = "%d m" % _gs().score
-	_best_label.text = "Best: %d m" % _gs().best_score
+	_final_score_label.text = "SCORE %d" % _gs().score
+	_best_label.text = "Best: %d PTS" % _gs().best_score
 
 
 func _restart_run() -> void:

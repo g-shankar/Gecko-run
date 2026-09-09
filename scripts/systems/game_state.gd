@@ -54,7 +54,7 @@ const MISSION_BONUS: int = 100 ## P18: points per completed mission.
 
 var max_lives: int = 3 ## P14: deaths per run before game over.
 
-var best_score: int = 0 ## P14: best distance, persisted.
+var best_score: int = 0 ## P14: best score, persisted. P22: was mislabeled "distance".
 
 var run_time: float = 0.0
 
@@ -170,6 +170,15 @@ func register_near_miss() -> void:
 	_bump_combo()
 	add_score(50 * _multiplier())
 	_update_missions() ## P18.
+	# P22: game-feel — a small camera kick and a gold flash at the gecko.
+	var rig := get_tree().get_first_node_in_group("camera_rig")
+	if rig != null and rig.has_method("add_trauma"):
+		rig.add_trauma(0.35)
+	var gecko := get_tree().get_first_node_in_group("gecko")
+	if gecko != null:
+		FX.burst(get_tree().root,
+			(gecko as Node3D).global_position + Vector3(0, 0.8, 0),
+			Color(1.0, 0.85, 0.2))
 
 
 ## P17: scoring actions build the combo (up to COMBO_MAX). Each action
