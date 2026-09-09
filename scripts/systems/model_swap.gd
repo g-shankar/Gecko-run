@@ -42,6 +42,14 @@ const MODELS := {
 		"path": "res://assets/models/bed.glb",
 		"size": Vector3(0.70, 0.25, 1.00), "min_y": -0.12, "verts": 8199,
 	},
+	"dog": {
+		"path": "res://assets/models/dog.glb",
+		"size": Vector3(1.00, 0.44, 0.38), "min_y": -0.22, "verts": 8409,
+	},
+	"mower": {
+		"path": "res://assets/models/mower.glb",
+		"size": Vector3(0.68, 0.73, 1.00), "min_y": -0.36, "verts": 8817,
+	},
 }
 
 

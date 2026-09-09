@@ -16,6 +16,8 @@ const HAZARD_SCRIPTS := {
 	"car": "res://scripts/systems/car.gd",
 	"sprinkler": "res://scripts/systems/sprinkler.gd",
 	"bug": "res://scripts/systems/bug_pickup.gd",
+	"dog": "res://scripts/systems/dog.gd",
+	"mower": "res://scripts/systems/mower.gd",
 }
 
 const HAZARD_NAMES := {
@@ -27,6 +29,8 @@ const HAZARD_NAMES := {
 	"car": "BackingCar",
 	"sprinkler": "Sprinkler",
 	"bug": "Bug",
+	"dog": "Dog", # + A/B per instance.
+	"mower": "Mower",
 }
 
 ## P20: the pergola — the gecko-fantasy ceiling route. Two climbable posts

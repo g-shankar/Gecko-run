@@ -16,7 +16,8 @@ class_name LevelData
 @export var level_name: String = "Backyard 1"
 @export var start_position: Vector3 = Vector3(0, 0, 6)
 ## Each spawn: {"type": <hazard id>, "pos": <Vector3>, "warn": <telegraph s>}.
-## Types: "shield", "speed", "footstep", "bicycle", "bird", "car", "sprinkler", "bug".
+## Types: "shield", "speed", "footstep", "bicycle", "bird", "car", "sprinkler",
+## "bug", "dog", "mower".
 ## P21: the route is ~365 m (60-90 s of run time). Difficulty ramps by
 ## section — later hazards get shorter warn_time (tighter telegraphs):
 ## A=1.0 s, B=0.85 s, C=0.7 s, D=0.6 s, E=0.5 s.
@@ -151,6 +152,7 @@ class_name LevelData
 	{ "type": "bug", "pos": Vector3(0.0, 0.8, -273) },
 	{ "type": "sprinkler", "pos": Vector3(-1.5, 0, -277), "warn": 0.5 },
 	{ "type": "footstep", "pos": Vector3(0, 0, -281), "warn": 0.5 },
+	{ "type": "dog", "pos": Vector3(4.0, 0, -283), "warn": 0.5 }, ## P28: the retriever guards the lane.
 	{ "type": "bug", "pos": Vector3(1.0, 0.8, -284) },
 	{ "type": "bug", "pos": Vector3(0.0, 0.8, -285) },
 	{ "type": "bug", "pos": Vector3(-1.0, 0.8, -286) },
@@ -159,6 +161,7 @@ class_name LevelData
 	{ "type": "bug", "pos": Vector3(1.5, 0.8, -294) },
 	{ "type": "footstep", "pos": Vector3(-0.5, 0, -298), "warn": 0.5 },
 	{ "type": "sprinkler", "pos": Vector3(1.5, 0, -302), "warn": 0.5 },
+	{ "type": "mower", "pos": Vector3(0, 0, -303), "warn": 0.5 }, ## P28: crossing mower, stripes + engine.
 	{ "type": "bug", "pos": Vector3(0.0, 0.8, -305) },
 	{ "type": "bug", "pos": Vector3(0.0, 0.8, -306) },
 	{ "type": "bird", "pos": Vector3(0, 0, -310), "warn": 0.5 },
@@ -169,6 +172,7 @@ class_name LevelData
 	{ "type": "bug", "pos": Vector3(0.0, 0.8, -325) },
 	{ "type": "bug", "pos": Vector3(0.0, 0.8, -326) },
 	{ "type": "bug", "pos": Vector3(0.0, 0.8, -327) },
+	{ "type": "dog", "pos": Vector3(-4.0, 0, -328), "warn": 0.5 }, ## P28: second dog, other side.
 	{ "type": "bicycle", "pos": Vector3(0, 0, -331), "warn": 0.5 },
 	{ "type": "sprinkler", "pos": Vector3(-1.5, 0, -335), "warn": 0.5 },
 	{ "type": "bug", "pos": Vector3(1.0, 0.8, -338) },
