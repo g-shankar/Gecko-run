@@ -2,13 +2,10 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cdrgpmvmr4gf"
+uid="uid://cev7n7n8v8wfe"
 path="res://.godot/imported/dog_Color_b27874d6-a2b9-41a3-a809-8809960e7112.jpg-ee9cd5730f22fd51bc96df063daef002.ctex"
 metadata={
 "vram_texture": false
-}
-generator_parameters={
-"md5": "7e10d5e568624a57be929bfd32b222f7"
 }
 
 [deps]
@@ -18,7 +15,7 @@ dest_files=["res://.godot/imported/dog_Color_b27874d6-a2b9-41a3-a809-8809960e711
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -26,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

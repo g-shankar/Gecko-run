@@ -2,13 +2,10 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://drvhgaclervv4"
+uid="uid://dsym8p67mr7e2"
 path="res://.godot/imported/plant_b_ORM_ca2f686d-bdd5-4e26-b6f0-66dd804580f7.jpg-efd18a74ea2bca90472bd90df540d96e.ctex"
 metadata={
 "vram_texture": false
-}
-generator_parameters={
-"md5": "046da85048b71cbbc86c7e6c56bd2fbb"
 }
 
 [deps]
@@ -18,7 +15,7 @@ dest_files=["res://.godot/imported/plant_b_ORM_ca2f686d-bdd5-4e26-b6f0-66dd80458
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -26,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""
@@ -39,5 +36,5 @@ process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
-process/size_limit=1024
+process/size_limit=0
 detect_3d/compress_to=1

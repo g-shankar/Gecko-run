@@ -2,13 +2,10 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cbrg0pu0lfix"
+uid="uid://clcx3bm81uplq"
 path="res://.godot/imported/bush_tall_NormalGL_c431364e-e65e-4904-8585-3891d1bca53c.jpg-87d02d9c5e4f46b1af3478de5f056d61.ctex"
 metadata={
 "vram_texture": false
-}
-generator_parameters={
-"md5": "946341059f86fa191dc8711423d54200"
 }
 
 [deps]
@@ -18,7 +15,7 @@ dest_files=["res://.godot/imported/bush_tall_NormalGL_c431364e-e65e-4904-8585-38
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -26,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

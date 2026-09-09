@@ -2,13 +2,10 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c2orrvahqppha"
+uid="uid://bbsaehw6r2ymx"
 path="res://.godot/imported/sneaker_Color_1b793103-91ba-48f9-bc06-6dfae178c281.jpg-a58340fd62e3cf3c00cf775a86fa552d.ctex"
 metadata={
 "vram_texture": false
-}
-generator_parameters={
-"md5": "e0a4213cc68ac7389ac62b338e2ddf83"
 }
 
 [deps]
@@ -18,7 +15,7 @@ dest_files=["res://.godot/imported/sneaker_Color_1b793103-91ba-48f9-bc06-6dfae17
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -26,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

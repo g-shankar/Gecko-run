@@ -2,13 +2,10 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bsqgmyhfxxoue"
+uid="uid://vqkk2i6e52g8"
 path="res://.godot/imported/flowers_ORM_41b25042-3e9a-4b8d-a465-bcaa9994bbeb.jpg-266a9cf36f219238d9e13e9ef9dae8e4.ctex"
 metadata={
 "vram_texture": false
-}
-generator_parameters={
-"md5": "fe3797810b61b4f786443164168c2692"
 }
 
 [deps]
@@ -18,7 +15,7 @@ dest_files=["res://.godot/imported/flowers_ORM_41b25042-3e9a-4b8d-a465-bcaa9994b
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -26,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

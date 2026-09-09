@@ -2,13 +2,10 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bm86vgly3qcww"
+uid="uid://b2fwy8hmvae6h"
 path="res://.godot/imported/bush_round_ORM_e6fe4c5b-7882-4b28-af66-e1ffab957933.jpg-0757d3049cddb19ff2cb27a7abb31891.ctex"
 metadata={
 "vram_texture": false
-}
-generator_parameters={
-"md5": "b5d02ce897f02b3760766b65708b5ddb"
 }
 
 [deps]
@@ -18,7 +15,7 @@ dest_files=["res://.godot/imported/bush_round_ORM_e6fe4c5b-7882-4b28-af66-e1ffab
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -26,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

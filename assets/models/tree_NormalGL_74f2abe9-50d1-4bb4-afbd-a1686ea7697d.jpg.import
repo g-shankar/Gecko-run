@@ -2,13 +2,10 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ci3ag2evn625m"
+uid="uid://c6mplbgfc7ntr"
 path="res://.godot/imported/tree_NormalGL_74f2abe9-50d1-4bb4-afbd-a1686ea7697d.jpg-d1cd00a312e182c937acef2a9fac0e95.ctex"
 metadata={
 "vram_texture": false
-}
-generator_parameters={
-"md5": "7ea8e5f6fa2a79ec75146911ede20778"
 }
 
 [deps]
@@ -18,7 +15,7 @@ dest_files=["res://.godot/imported/tree_NormalGL_74f2abe9-50d1-4bb4-afbd-a1686ea
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -26,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

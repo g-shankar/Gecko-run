@@ -2,16 +2,23 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b6u5jsngn32e5"
-valid=false
+uid="uid://h2vys1it4iqv"
+path="res://.godot/imported/palm_Color_fa6ba0f1-fb16-4988-9eb3-a9218937cda0.jpg-178c039457d110a7b84d210c18309c15.ctex"
+metadata={
+"vram_texture": false
+}
+generator_parameters={
+"md5": "dd381f5fc63cd4e56cf80f2678641c05"
+}
 
 [deps]
 
 source_file="res://assets/models/palm_Color_fa6ba0f1-fb16-4988-9eb3-a9218937cda0.jpg"
+dest_files=["res://.godot/imported/palm_Color_fa6ba0f1-fb16-4988-9eb3-a9218937cda0.jpg-178c039457d110a7b84d210c18309c15.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -19,7 +26,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=false
+mipmaps/generate=true
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

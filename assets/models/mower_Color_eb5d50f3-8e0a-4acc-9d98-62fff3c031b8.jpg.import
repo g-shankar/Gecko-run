@@ -2,13 +2,10 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://d0o5erpuqm11i"
+uid="uid://duwkexs240xus"
 path="res://.godot/imported/mower_Color_eb5d50f3-8e0a-4acc-9d98-62fff3c031b8.jpg-b82233fbb6d1ee5f12714e17820c595c.ctex"
 metadata={
 "vram_texture": false
-}
-generator_parameters={
-"md5": "5207a50619e02a1287cba8828ec401bc"
 }
 
 [deps]
@@ -18,7 +15,7 @@ dest_files=["res://.godot/imported/mower_Color_eb5d50f3-8e0a-4acc-9d98-62fff3c03
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -26,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

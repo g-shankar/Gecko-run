@@ -2,13 +2,10 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cq4tuoiaj725q"
+uid="uid://c0s1e5qk5juyi"
 path="res://.godot/imported/dog_NormalGL_b27874d6-a2b9-41a3-a809-8809960e7112.jpg-9e9942902113ba427eeb5cbe6dedbc27.ctex"
 metadata={
 "vram_texture": false
-}
-generator_parameters={
-"md5": "e715d1b47168a18d5d7866ad9123fc2b"
 }
 
 [deps]
@@ -18,7 +15,7 @@ dest_files=["res://.godot/imported/dog_NormalGL_b27874d6-a2b9-41a3-a809-8809960e
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -26,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

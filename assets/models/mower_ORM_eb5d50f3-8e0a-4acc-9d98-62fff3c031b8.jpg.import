@@ -2,13 +2,10 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c6ibnuk37q68s"
+uid="uid://dqyod7bsmdjvs"
 path="res://.godot/imported/mower_ORM_eb5d50f3-8e0a-4acc-9d98-62fff3c031b8.jpg-3f3d02b979f60b586e7b0f37ad28b2a8.ctex"
 metadata={
 "vram_texture": false
-}
-generator_parameters={
-"md5": "8a300e0864eebde4b95c1a28a40624c8"
 }
 
 [deps]
@@ -18,7 +15,7 @@ dest_files=["res://.godot/imported/mower_ORM_eb5d50f3-8e0a-4acc-9d98-62fff3c031b
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -26,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

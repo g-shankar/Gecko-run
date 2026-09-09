@@ -2,13 +2,10 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b1bi67x1e7eem"
+uid="uid://c3dbyw5j130lq"
 path="res://.godot/imported/bicycle_Color_994c6eb0-4ec3-4b90-a669-2d34ecb0de97.jpg-335f478dbaed7abf3810ba46ada530b2.ctex"
 metadata={
 "vram_texture": false
-}
-generator_parameters={
-"md5": "308e305d6af2dd97a560da374b9505da"
 }
 
 [deps]
@@ -18,7 +15,7 @@ dest_files=["res://.godot/imported/bicycle_Color_994c6eb0-4ec3-4b90-a669-2d34ecb
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -26,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""
@@ -39,5 +36,5 @@ process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
-process/size_limit=1024
+process/size_limit=0
 detect_3d/compress_to=1

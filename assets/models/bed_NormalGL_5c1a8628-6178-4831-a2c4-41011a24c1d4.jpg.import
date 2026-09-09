@@ -2,13 +2,10 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dfetrjw0tlenx"
+uid="uid://lq224u3k8bj7"
 path="res://.godot/imported/bed_NormalGL_5c1a8628-6178-4831-a2c4-41011a24c1d4.jpg-8d67badc63c773ca3f50104b3aad0ecd.ctex"
 metadata={
 "vram_texture": false
-}
-generator_parameters={
-"md5": "c1715d1b7cd0482d8473f86d335ce90a"
 }
 
 [deps]
@@ -18,7 +15,7 @@ dest_files=["res://.godot/imported/bed_NormalGL_5c1a8628-6178-4831-a2c4-41011a24
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -26,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""
@@ -39,5 +36,5 @@ process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
-process/size_limit=1024
+process/size_limit=0
 detect_3d/compress_to=1

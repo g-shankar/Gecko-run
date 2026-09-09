@@ -2,7 +2,7 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://0p3q5yghyd2b"
+uid="uid://calvhsjkca35x"
 path="res://.godot/imported/sprinkler_NormalGL_03b53677-cebc-46e9-995b-e135b47015af.jpg-a1fd618b499ee6e09dbea866ad41cc1e.ctex"
 metadata={
 "vram_texture": false
@@ -15,7 +15,7 @@ dest_files=["res://.godot/imported/sprinkler_NormalGL_03b53677-cebc-46e9-995b-e1
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -36,5 +36,5 @@ process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
-process/size_limit=1024
+process/size_limit=0
 detect_3d/compress_to=1
