@@ -23,6 +23,9 @@ func _init() -> void:
 		return
 	var main: Node = packed.instantiate()
 	root.add_child(main)
+	# Freeze the gecko early: it must not collect bugs before we verify spawns.
+	var _gecko_early: CharacterBody3D = main.get_node("Gecko")
+	_gecko_early.run_speed = 0.0
 	# P14: the GameState autoload starts in READY (start screen). Tests
 	# bypass it: wait a beat for it to load, then remove it so the gecko
 	# runs immediately (gs==null means "just run").
@@ -54,6 +57,12 @@ func _init() -> void:
 				found = true
 			elif (h as Node).name.begins_with("Bicycle") and absf(hp.z - want.z) < 0.05:
 				found = true # The bicycle crosses in x; its lane (z) is what matters.
+			elif (h as Node).name.begins_with("Bug"):
+				# Bugs bob in Y; check XZ only.
+				var dx: float = hp.x - want.x
+				var dz: float = hp.z - want.z
+				if sqrt(dx * dx + dz * dz) < 0.05:
+					found = true
 		check(found, "hazard at %s" % str(want))
 
 	# Route order: spawns march forward (decreasing z) — a legible run.

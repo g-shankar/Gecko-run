@@ -16,14 +16,24 @@ class_name LevelData
 @export var level_name: String = "Backyard 1"
 @export var start_position: Vector3 = Vector3(0, 0, 6)
 ## Each spawn: {"type": <hazard id>, "pos": <Vector3>}.
-## Types: "shield", "footstep", "bicycle", "bird", "car", "sprinkler".
+## Types: "shield", "footstep", "bicycle", "bird", "car", "sprinkler", "bug".
 @export var spawns: Array = [
 	{ "type": "shield", "pos": Vector3(0, 0, -4) },
+	{ "type": "bug", "pos": Vector3(-1.0, 0.8, -5) },
+	{ "type": "bug", "pos": Vector3(0.0, 0.8, -5.5) },
+	{ "type": "bug", "pos": Vector3(1.0, 0.8, -6) },
 	{ "type": "footstep", "pos": Vector3(0, 0, -6) },
 	{ "type": "sprinkler", "pos": Vector3(-1.5, 0, -8) },
+	{ "type": "bug", "pos": Vector3(1.5, 0.8, -9) },
+	{ "type": "bug", "pos": Vector3(1.5, 0.8, -10) },
 	{ "type": "bicycle", "pos": Vector3(0, 0, -11) },
+	{ "type": "bug", "pos": Vector3(-1.0, 1.2, -12) },
+	{ "type": "bug", "pos": Vector3(0.0, 1.5, -12.5) },
+	{ "type": "bug", "pos": Vector3(1.0, 1.2, -13) },
 	{ "type": "bird", "pos": Vector3(0, 0, -13) },
 	{ "type": "footstep", "pos": Vector3(0, 0, -15) },
+	{ "type": "bug", "pos": Vector3(0, 0.8, -16) },
+	{ "type": "bug", "pos": Vector3(0, 0.8, -17) },
 	{ "type": "car", "pos": Vector3(6, 0, -19) },
 ]
 @export var fence_z: float = -20.0 ## Where the climbable fence stands.
