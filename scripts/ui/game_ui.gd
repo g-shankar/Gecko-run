@@ -26,6 +26,9 @@ var _shield_label: Label
 var _near_miss_label: Label ## P15: "NEAR MISS +50!" popup.
 var _near_miss_timer: float = 0.0
 var _combo_label: Label ## P17: "COMBO x3" indicator.
+var _mission_label: Label ## P18: mission tracker ("BUGS 7/15").
+var _mission_popup_label: Label ## P18: "MISSION COMPLETE!" popup.
+var _mission_popup_timer: float = 0.0
 var _final_score_label: Label
 var _best_label: Label
 
@@ -48,6 +51,7 @@ func _ready() -> void:
 	gs.deaths_changed.connect(_on_deaths_changed)
 	gs.near_misses_changed.connect(_on_near_miss)
 	gs.combo_changed.connect(_on_combo_changed)
+	gs.mission_completed.connect(_on_mission_completed)
 
 
 func _on_state_changed(new_state: int) -> void:
@@ -86,17 +90,45 @@ func _on_combo_changed(new_combo: int) -> void:
 		_combo_label.visible = false
 
 
+## P18: flash "MISSION COMPLETE!" center-screen.
+func _on_mission_completed(_mission_id: String) -> void:
+	_mission_popup_label.visible = true
+	_mission_popup_label.modulate.a = 1.0
+	_mission_popup_timer = 1.6
+
+
 func _process(delta: float) -> void:
 	# Shield indicator follows the gecko.
 	var gecko := get_tree().get_first_node_in_group("gecko")
 	if gecko != null:
 		_shield_label.visible = int(gecko.get("shield_charges")) > 0
+	_update_mission_tracker() ## P18.
 	# P15: near-miss popup fades out.
 	if _near_miss_timer > 0.0:
 		_near_miss_timer -= delta
 		_near_miss_label.modulate.a = clampf(_near_miss_timer / 1.2, 0.0, 1.0)
 		if _near_miss_timer <= 0.0:
 			_near_miss_label.visible = false
+	# P18: mission popup fades out.
+	if _mission_popup_timer > 0.0:
+		_mission_popup_timer -= delta
+		_mission_popup_label.modulate.a = clampf(_mission_popup_timer / 1.6, 0.0, 1.0)
+		if _mission_popup_timer <= 0.0:
+			_mission_popup_label.visible = false
+
+
+## P18: show the first incomplete mission's progress. All done: celebrate.
+func _update_mission_tracker() -> void:
+	var gs := _gs()
+	if gs == null or _mission_label == null:
+		return
+	for m in (gs.get("missions") as Array):
+		if not bool(m["done"]):
+			_mission_label.text = "%s %d/%d%s" % [
+				String(m["label"]), int(m["progress"]),
+				int(m["target"]), String(m["unit"])]
+			return
+	_mission_label.text = "ALL MISSIONS DONE!"
 
 
 func _show_only(panel: Control) -> void:
@@ -200,6 +232,21 @@ func _build_hud() -> void:
 	_combo_label.position = Vector2(-220, 100)
 	_combo_label.visible = false
 	_hud.add_child(_combo_label)
+	# P18: mission tracker, top-left below shield.
+	_mission_label = _make_label("BUGS 0/15", 24)
+	_mission_label.add_theme_color_override("font_color", Color(0.7, 1.0, 0.5))
+	_mission_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_mission_label.position = Vector2(20, 144)
+	_hud.add_child(_mission_label)
+	# P18: mission-complete popup, center-screen above the near-miss one.
+	_mission_popup_label = _make_label("MISSION COMPLETE!", 44)
+	_mission_popup_label.add_theme_color_override("font_color", Color(0.5, 1.0, 0.5))
+	_mission_popup_label.set_anchors_preset(Control.PRESET_CENTER)
+	_mission_popup_label.position = Vector2(-220, -140)
+	_mission_popup_label.size = Vector2(440, 70)
+	_mission_popup_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_mission_popup_label.visible = false
+	_hud.add_child(_mission_popup_label)
 
 
 func _on_pause_pressed() -> void:
