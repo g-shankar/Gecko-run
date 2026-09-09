@@ -21,7 +21,7 @@ func _run() -> void:
 	_gecko = scene.get_node("Gecko")
 	# Park every hazard: these suites test wall movement, not dodging.
 	for hn in ["FootstepA", "FootstepB", "Bicycle", "BackingCar"]:
-		var hz: Area3D = scene.get_node(hn)
+		var hz: Area3D = scene.get_node("Level/" + hn)
 		hz.set_physics_process(false)
 		hz.position = Vector3(100, 0, 100)
 	_rig = scene.get_node("CameraRig")

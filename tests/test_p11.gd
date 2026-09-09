@@ -20,11 +20,11 @@ func _run() -> void:
 	_gecko = scene.get_node("Gecko")
 	# Park the footsteps out of the way: this test is about bike + car.
 	for fn in ["FootstepA", "FootstepB"]:
-		var fs: Area3D = scene.get_node(fn)
+		var fs: Area3D = scene.get_node("Level/" + fn)
 		fs.set_physics_process(false)
 		fs.position.x = 100.0
-	var bike: Area3D = scene.get_node("Bicycle")
-	var car: Area3D = scene.get_node("BackingCar")
+	var bike: Area3D = scene.get_node("Level/Bicycle")
+	var car: Area3D = scene.get_node("Level/BackingCar")
 	# Bicycle: wait for the crossing, verify it sweeps the track.
 	var crossed := false
 	var x_start: float = 0.0

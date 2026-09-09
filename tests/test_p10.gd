@@ -17,7 +17,7 @@ func _run() -> void:
 	var scene: Node = packed.instantiate()
 	root.add_child(scene)
 	_gecko = scene.get_node("Gecko")
-	var hz: Area3D = scene.get_node("FootstepA")
+	var hz: Area3D = scene.get_node("Level/FootstepA")
 	# Telegraph: the shadow should appear during the warn phase.
 	var telegraphed := false
 	for i in range(300):
