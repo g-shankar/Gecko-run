@@ -16,7 +16,7 @@ extends "res://scripts/systems/hazard_base.gd"
 @export var fan_width: float = 0.7 ## Water fan thickness (m).
 
 var _base: MeshInstance3D
-var _head: MeshInstance3D
+var _head: Node3D ## P25: was MeshInstance3D; now a model wrapper (or primitive fallback).
 var _fan: MeshInstance3D
 var _fan_mat: StandardMaterial3D
 var _sputter: MeshInstance3D
@@ -58,13 +58,14 @@ func _build() -> void:
 	head_mesh.top_radius = 0.13
 	head_mesh.bottom_radius = 0.15
 	head_mesh.height = 0.35
-	_head.mesh = head_mesh
+	(_head as MeshInstance3D).mesh = head_mesh
 	var head_mat := StandardMaterial3D.new()
 	head_mat.albedo_color = Color(0.2, 0.55, 0.25, 1.0) # Sprinkler green.
 	head_mat.roughness = 0.5
-	_head.material_override = head_mat
+	(_head as MeshInstance3D).material_override = head_mat
 	_head.position = Vector3(0, 0.05, 0) # Retracted.
 	add_child(_head)
+	_swap_head_model() # P25: real sprinkler model; primitive stays on failure.
 	# Water fan: translucent blue box, pivots at the head.
 	_fan = MeshInstance3D.new()
 	var fan_mesh := BoxMesh.new()
@@ -93,6 +94,19 @@ func _build() -> void:
 	_sputter.position = Vector3(0, pop_height + 0.2, 0)
 	_sputter.visible = false
 	add_child(_sputter)
+
+
+## P25: replace the primitive pop-up head with the Tripo sprinkler model.
+## The pop-up animation targets _head.position.y, which works on the wrapper.
+## Hit zone, fan telegraph, and timings are untouched.
+func _swap_head_model() -> void:
+	var model := ModelSwap.make_visual_by_height("sprinkler", 0.55)
+	if model == null:
+		return
+	model.position = _head.position
+	_head.queue_free()
+	_head = model
+	add_child(_head)
 
 
 func _on_telegraph() -> void:

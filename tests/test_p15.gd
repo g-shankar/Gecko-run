@@ -82,7 +82,7 @@ func _initialize() -> void:
 		await process_frame
 		if sprinkler.phase != 1:
 			break
-	var head: MeshInstance3D = sprinkler.get("_head")
+	var head: Node3D = sprinkler.get("_head") # P25: _head is a Node3D wrapper now.
 	check(head != null and head.position.y > 0.2, "sprinkler head pops up during TELEGRAPH")
 
 	# --- 4: near-miss ---

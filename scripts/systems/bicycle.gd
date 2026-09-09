@@ -16,6 +16,7 @@ var _lane: MeshInstance3D
 var _lane_mat: StandardMaterial3D
 var _direction: float = 1.0
 var _start_x: float = 0.0
+var _visual: Node3D ## P25: Tripo bike+rider model wrapper (or primitive group).
 
 
 func _ready() -> void:
@@ -37,41 +38,17 @@ func _build() -> void:
 	zone.shape = zone_shape
 	zone.position = Vector3(0, 0.8, 0)
 	add_child(zone)
-	# Frame: red box.
-	var frame := MeshInstance3D.new()
-	var frame_mesh := BoxMesh.new()
-	frame_mesh.size = Vector3(1.6, 0.25, 0.25)
-	frame.mesh = frame_mesh
-	frame.position = Vector3(0, 0.7, 0)
-	var frame_mat := StandardMaterial3D.new()
-	frame_mat.albedo_color = Color(0.8, 0.1, 0.1, 1.0)
-	frame.material_override = frame_mat
-	add_child(frame)
-	# Wheels: two dark cylinders.
-	for wx in [-0.6, 0.6]:
-		var wheel := MeshInstance3D.new()
-		var wheel_mesh := CylinderMesh.new()
-		wheel_mesh.top_radius = 0.35
-		wheel_mesh.bottom_radius = 0.35
-		wheel_mesh.height = 0.12
-		wheel.mesh = wheel_mesh
-		wheel.rotation_degrees.x = 90.0
-		wheel.position = Vector3(wx, 0.35, 0)
-		var wheel_mat := StandardMaterial3D.new()
-		wheel_mat.albedo_color = Color(0.08, 0.08, 0.08, 1.0)
-		wheel.material_override = wheel_mat
-		add_child(wheel)
-	# Rider: simple capsule silhouette.
-	var rider := MeshInstance3D.new()
-	var rider_mesh := CapsuleMesh.new()
-	rider_mesh.radius = 0.22
-	rider_mesh.height = 0.9
-	rider.mesh = rider_mesh
-	rider.position = Vector3(0, 1.25, 0)
-	var rider_mat := StandardMaterial3D.new()
-	rider_mat.albedo_color = Color(0.15, 0.25, 0.6, 1.0)
-	rider.material_override = rider_mat
-	add_child(rider)
+	# Bike visual: P25 real model (rider on a city bike). Falls back to the
+	# primitive frame/wheels/rider if the GLB fails to load.
+	_visual = Node3D.new()
+	_visual.name = "BikeVisual"
+	add_child(_visual)
+	var model := ModelSwap.make_visual("bicycle", 1.9)
+	if model == null:
+		_build_primitive_bike()
+	else:
+		_visual.add_child(model)
+	_face_travel_direction()
 	# Lane telegraph: yellow strip across the track. A sibling so it stays
 	# at the crossing while the bike itself moves.
 	_lane = MeshInstance3D.new()
@@ -88,8 +65,57 @@ func _build() -> void:
 	_lane.visible = false
 
 
+## P25: the Tripo bike model faces -Z natively; rotate the wrapper so it
+## faces the travel direction (+X when _direction is +1). Called whenever the
+## direction flips so the rider never rides backwards.
+func _face_travel_direction() -> void:
+	if _visual == null:
+		return
+	_visual.rotation.y = -PI / 2.0 if _direction > 0.0 else PI / 2.0
+
+
+## P25: the old primitive bike, kept as a fallback if the model is missing.
+func _build_primitive_bike() -> void:
+	# Frame: red box.
+	var frame := MeshInstance3D.new()
+	var frame_mesh := BoxMesh.new()
+	frame_mesh.size = Vector3(1.6, 0.25, 0.25)
+	frame.mesh = frame_mesh
+	frame.position = Vector3(0, 0.7, 0)
+	var frame_mat := StandardMaterial3D.new()
+	frame_mat.albedo_color = Color(0.8, 0.1, 0.1, 1.0)
+	frame.material_override = frame_mat
+	_visual.add_child(frame)
+	# Wheels: two dark cylinders.
+	for wx in [-0.6, 0.6]:
+		var wheel := MeshInstance3D.new()
+		var wheel_mesh := CylinderMesh.new()
+		wheel_mesh.top_radius = 0.35
+		wheel_mesh.bottom_radius = 0.35
+		wheel_mesh.height = 0.12
+		wheel.mesh = wheel_mesh
+		wheel.rotation_degrees.x = 90.0
+		wheel.position = Vector3(wx, 0.35, 0)
+		var wheel_mat := StandardMaterial3D.new()
+		wheel_mat.albedo_color = Color(0.08, 0.08, 0.08, 1.0)
+		wheel.material_override = wheel_mat
+		_visual.add_child(wheel)
+	# Rider: simple capsule silhouette.
+	var rider := MeshInstance3D.new()
+	var rider_mesh := CapsuleMesh.new()
+	rider_mesh.radius = 0.22
+	rider_mesh.height = 0.9
+	rider.mesh = rider_mesh
+	rider.position = Vector3(0, 1.25, 0)
+	var rider_mat := StandardMaterial3D.new()
+	rider_mat.albedo_color = Color(0.15, 0.25, 0.6, 1.0)
+	rider.material_override = rider_mat
+	_visual.add_child(rider)
+
+
 func _on_telegraph() -> void:
 	_lane.visible = true
+	_face_travel_direction() # P25: rider faces the travel direction.
 
 
 func _on_idle() -> void:

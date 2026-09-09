@@ -76,12 +76,40 @@ func _paint_ground() -> void:
 	ground.material_override = mat
 
 
-## The finish-gate fence becomes weathered vertical planks.
+## P25: the finish-gate fence becomes REAL fence sections — two weathered
+## picket runs tiled across the 14 m gate, full 5 m collision height.
+## The old textured box is hidden; collision is untouched.
 func _paint_fence() -> void:
 	var fence := get_parent().get_node_or_null("Fence") as Node3D
 	if fence == null:
 		return
 	var mi := fence.get_node_or_null("MeshInstance3D") as MeshInstance3D
+	var spec: Dictionary = ModelSwap.MODELS["fence"]
+	var packed: PackedScene = load(spec["path"])
+	if packed == null:
+		_paint_fence_fallback(mi)
+		return
+	if mi != null:
+		mi.visible = false
+	# Native: 1.0 m long (Z), 0.54 m tall. Scale to the 5 m gate height,
+	# rotate Z-length onto X, tile two runs across the 14 m width.
+	var size: Vector3 = spec["size"]
+	var s: float = 5.0 / size.y
+	var section_len: float = size.z * s
+	for i in 2:
+		var inst: Node = packed.instantiate()
+		var wrap := Node3D.new()
+		wrap.name = "FenceRun%d" % (i + 1)
+		wrap.add_child(inst)
+		inst.scale = Vector3.ONE * s
+		inst.position.y = -float(spec["min_y"]) * s
+		wrap.rotation.y = PI / 2.0
+		wrap.position = Vector3((i - 0.5) * section_len, -2.5, 0)
+		fence.add_child(wrap)
+
+
+## P25 fallback: P24's wood texture if the fence model is missing.
+func _paint_fence_fallback(mi: MeshInstance3D) -> void:
 	if mi == null:
 		return
 	var mat := StandardMaterial3D.new()
@@ -91,24 +119,64 @@ func _paint_fence() -> void:
 	mi.material_override = mat
 
 
-## Planter boxes become garden beds: wood sides, soil top, leafy plants.
-## Plants are decoration only — no collision, inside the box footprint.
+## P25: planter boxes become REAL raised beds (Tripo timber + soil) with REAL
+## plants (two variants, alternating). The old box mesh is hidden; the
+## P24 soil slab + quad plants are skipped. Collision is untouched.
 func _paint_planters() -> void:
-	var wood := _make_wood_texture()
-	var soil := _make_soil_texture()
-	var leaf := _make_leaf_texture()
+	var bed_spec: Dictionary = ModelSwap.MODELS["bed"]
+	var bed_packed: PackedScene = load(bed_spec["path"])
 	for pname in ["PlanterBoxA", "PlanterBoxB"]:
 		var pb := get_parent().get_node_or_null(pname) as Node3D
 		if pb == null:
 			continue
 		var mi := pb.get_node_or_null("MeshInstance3D") as MeshInstance3D
+		if bed_packed == null:
+			_paint_planter_fallback(pb, mi)
+			continue
 		if mi != null:
-			var wmat := StandardMaterial3D.new()
-			wmat.albedo_texture = wood
-			wmat.roughness = 0.9
-			wmat.uv1_scale = Vector3(1.5, 1, 1)
-			mi.material_override = wmat
-		_add_soil_and_plants(pb, soil, leaf)
+			mi.visible = false
+		# Bed model: 1.0 m long (Z). Scale to the 1.2 m planter footprint.
+		var bed_size: Vector3 = bed_spec["size"]
+		var bs: float = 1.2 / maxf(bed_size.x, bed_size.z)
+		var bed_wrap := Node3D.new()
+		bed_wrap.name = "BedModel"
+		var bed_inst: Node = bed_packed.instantiate()
+		bed_wrap.add_child(bed_inst)
+		bed_inst.scale = Vector3.ONE * bs
+		bed_inst.position.y = -float(bed_spec["min_y"]) * bs
+		bed_wrap.position = Vector3(0, -0.3, 0) # Planter node sits at y=0.3.
+		pb.add_child(bed_wrap)
+		_add_model_plants(bed_wrap, bs)
+
+
+## Four real plants per bed, alternating the two Tripo variants.
+func _add_model_plants(bed_wrap: Node3D, bed_scale: float) -> void:
+	var variants := ["plant_a", "plant_b"]
+	var spots := [Vector3(-0.3, 0, -0.25), Vector3(0.3, 0, -0.25),
+		Vector3(-0.3, 0, 0.25), Vector3(0.3, 0, 0.25)]
+	var soil_top: float = 0.25 * bed_scale + 0.02
+	for i in spots.size():
+		var v: Node3D = ModelSwap.make_visual(variants[i % 2], 0.5)
+		if v == null:
+			continue
+		v.name = "Plant%d" % (i + 1)
+		v.position = Vector3(spots[i].x, soil_top, spots[i].z)
+		v.rotation.y = _rng.randf() * TAU
+		bed_wrap.add_child(v)
+
+
+## P25 fallback: P24's wood box + soil slab + quad plants if models missing.
+func _paint_planter_fallback(pb: Node3D, mi: MeshInstance3D) -> void:
+	var wood := _make_wood_texture()
+	var soil := _make_soil_texture()
+	var leaf := _make_leaf_texture()
+	if mi != null:
+		var wmat := StandardMaterial3D.new()
+		wmat.albedo_texture = wood
+		wmat.roughness = 0.9
+		wmat.uv1_scale = Vector3(1.5, 1, 1)
+		mi.material_override = wmat
+	_add_soil_and_plants(pb, soil, leaf)
 
 
 func _add_soil_and_plants(pb: Node3D, soil_tex: Texture2D, leaf_tex: Texture2D) -> void:

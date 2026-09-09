@@ -76,32 +76,52 @@ func _initialize() -> void:
 	check(grass_tex != null, "Ground has a textured material_override (grass)")
 	check(grass_tex != null and grass_tex.get_size().x >= 256, "grass texture is hi-res enough")
 
-	# --- 5: wooden fence ---
+	# --- 5: wooden fence (P25: real model runs; P24 texture is the fallback) ---
 	var fence_mi := main.get_node_or_null("Fence/MeshInstance3D") as MeshInstance3D
-	check(_tex_of(fence_mi) != null, "Fence mesh has a wood texture")
+	var fence_runs := 0
+	var fence := main.get_node_or_null("Fence")
+	if fence != null:
+		for c in fence.get_children():
+			if String(c.name).begins_with("FenceRun"):
+				fence_runs += 1
+	if fence_runs > 0:
+		check(fence_runs >= 2, "Fence has tiled model runs (%d)" % fence_runs)
+		check(fence_mi == null or not fence_mi.visible, "old fence box hidden under models")
+	else:
+		check(_tex_of(fence_mi) != null, "Fence mesh has a wood texture (fallback)")
 
-	# --- 6: planted garden beds ---
+	# --- 6: planted garden beds (P25: real bed + plant models) ---
 	for pname in ["PlanterBoxA", "PlanterBoxB"]:
 		var pb := main.get_node_or_null(pname) as Node3D
 		check(pb != null, "%s still exists" % pname)
 		var pmi := main.get_node_or_null(pname + "/MeshInstance3D") as MeshInstance3D
-		check(_tex_of(pmi) != null, "%s box has a wood texture" % pname)
-		var soil := pb.get_node_or_null("SoilSlab") if pb != null else null
-		check(soil is MeshInstance3D, "%s has a SoilSlab" % pname)
-		var plants := 0
-		var alpha_cutout := false
-		if pb != null:
-			for c in pb.get_children():
+		var bed := pb.get_node_or_null("BedModel") if pb != null else null
+		if bed != null:
+			check(pmi == null or not pmi.visible, "%s old box hidden under bed model" % pname)
+			var plants := 0
+			for c in bed.get_children():
 				if String(c.name).begins_with("Plant"):
 					plants += 1
-					for q in c.get_children():
-						if q is MeshInstance3D:
-							var qm := (q as MeshInstance3D).mesh as QuadMesh
-							var lm := qm.material as StandardMaterial3D if qm != null else null
-							if lm != null and lm.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR:
-								alpha_cutout = true
-		check(plants >= 4, "%s has leafy plants (%d)" % [pname, plants])
-		check(alpha_cutout, "%s plants use alpha cutout" % pname)
+			check(plants >= 4, "%s has real plant models (%d)" % [pname, plants])
+		else:
+			# P24 fallback path: wood texture + soil slab + quad plants.
+			check(_tex_of(pmi) != null, "%s box has a wood texture" % pname)
+			var soil := pb.get_node_or_null("SoilSlab") if pb != null else null
+			check(soil is MeshInstance3D, "%s has a SoilSlab" % pname)
+			var plants := 0
+			var alpha_cutout := false
+			if pb != null:
+				for c in pb.get_children():
+					if String(c.name).begins_with("Plant"):
+						plants += 1
+						for q in c.get_children():
+							if q is MeshInstance3D:
+								var qm := (q as MeshInstance3D).mesh as QuadMesh
+								var lm := qm.material as StandardMaterial3D if qm != null else null
+								if lm != null and lm.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR:
+									alpha_cutout = true
+			check(plants >= 4, "%s has leafy plants (%d)" % [pname, plants])
+			check(alpha_cutout, "%s plants use alpha cutout" % pname)
 
 	# --- 7: pergola re-skinned ---
 	var pergola := main.get_node_or_null("Level/Pergola")
