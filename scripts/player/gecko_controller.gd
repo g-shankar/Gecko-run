@@ -32,6 +32,8 @@ const DebugHUDScript := preload("res://scripts/dev/debug_hud.gd")
 
 ## --- Tuning (spec §7) -------------------------------------------------------
 @export var run_speed: float = 5.0     ## Constant auto-forward speed (m/s).
+@export var speed_ramp: float = 0.15  ## P16: +m/s per second of run time.
+@export var max_speed: float = 9.0    ## P16: speed ramp ceiling (m/s).
 @export var steer_speed: float = 3.2   ## Top sideways speed (m/s).
 @export var steer_accel: float = 18.0  ## How snappy steering feels (m/s^2).
 @export var gravity: float = 22.0      ## Snappier than Earth's 9.8: arcade feel.
@@ -455,10 +457,15 @@ func _apply_run_movement(delta: float) -> void:
 	# 2. Auto-forward: constant speed, always -Z. The player never controls this.
 	# P7: right after a wall kick the shove-off momentum is preserved and
 	# eased back into the auto-run, so the kick visibly arcs off the wall.
+	# P16: speed ramps with run time (the "one more run" tension).
+	var gs2 := _gs()
+	var effective_speed: float = run_speed
+	if gs2 != null:
+		effective_speed = minf(run_speed + gs2.run_time * speed_ramp, max_speed)
 	if _kick_timer > 0.0:
-		velocity.z = move_toward(velocity.z, -run_speed, 30.0 * delta)
+		velocity.z = move_toward(velocity.z, -effective_speed, 30.0 * delta)
 	else:
-		velocity.z = -run_speed
+		velocity.z = -effective_speed
 
 	# 3. Gravity: keeps the gecko planted; lets it leave the ground when jumping.
 	if not is_on_floor():
