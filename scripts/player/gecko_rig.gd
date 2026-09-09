@@ -124,6 +124,7 @@ static func _segment(mdt: MeshDataTool) -> Dictionary:
 		verts[i] = mdt.get_vertex(i)
 	# Pass 1: per-vertex part id.
 	var vid_part := {}
+	var _extra_part := {} ## Overlap verts -> second part id.
 	var leg_ids: Array = []
 	var tail_ids: Array = []
 	for i in n:
@@ -164,7 +165,9 @@ static func _segment(mdt: MeshDataTool) -> Dictionary:
 			vid_part[i] = leg_of[i]
 		else:
 			return {} # Leg clustering failed; caller falls back.
-	# Pass 3: tail -> 3 bands by x (tail1 = front band at body).
+	# Pass 3: tail -> 3 overlapping bands by x (tail1 = front band at
+	# body). Bands overlap generously so the chained pivots never open a
+	# visible gap when adjacent sections rotate differentially.
 	if tail_ids.size() < 12:
 		return {}
 	var min_x := 999.0
@@ -175,12 +178,17 @@ static func _segment(mdt: MeshDataTool) -> Dictionary:
 	var span := maxf(max_x - min_x, 0.001)
 	for i in tail_ids:
 		var t := (verts[i].x - min_x) / span
-		if t < 0.34:
-			vid_part[i] = "tail3"
-		elif t < 0.67:
+		if t >= 0.55:
+			vid_part[i] = "tail1"
+		elif t >= 0.30:
 			vid_part[i] = "tail2"
 		else:
-			vid_part[i] = "tail1"
+			vid_part[i] = "tail3"
+		# Overlap: boundary verts belong to both adjacent bands.
+		if t >= 0.45 and t < 0.65:
+			_extra_part[i] = "tail2" if vid_part[i] == "tail1" else "tail1"
+		if t >= 0.20 and t < 0.40:
+			_extra_part[i] = "tail3" if vid_part[i] == "tail2" else "tail2"
 	# Pass 4: per-face part assignment with double coverage at boundaries.
 	var part_ids := ["body", "head", "tail1", "tail2", "tail3",
 		"leg_LF", "leg_RF", "leg_LH", "leg_RH"]
@@ -193,9 +201,10 @@ static func _segment(mdt: MeshDataTool) -> Dictionary:
 		var vb := mdt.get_face_vertex(f, 1)
 		var vc := mdt.get_face_vertex(f, 2)
 		var ps := {}
-		ps[vid_part[va]] = true
-		ps[vid_part[vb]] = true
-		ps[vid_part[vc]] = true
+		for vid in [va, vb, vc]:
+			ps[vid_part[vid]] = true
+			if _extra_part.has(vid):
+				ps[_extra_part[vid]] = true
 		var tri := [va, vb, vc]
 		for pid in ps.keys():
 			(faces[pid] as Array).append(tri)
