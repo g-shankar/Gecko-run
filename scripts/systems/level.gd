@@ -48,6 +48,25 @@ func _ready() -> void:
 	for spawn in (level_data.get("spawns") as Array):
 		_spawn_hazard(spawn)
 	_build_ceiling_route() ## P20: pergola with the climbable ceiling.
+	_place_fence() ## P21: the fence stands at the route's end.
+	_stretch_ground() ## P21: the visual ground must cover the long route.
+
+
+## P21: the fence is the finish gate — park it at the data's fence_z.
+func _place_fence() -> void:
+	var fence := get_parent().get_node_or_null("Fence")
+	if fence != null:
+		(fence as Node3D).position.z = float(level_data.get("fence_z"))
+
+
+## P21: the ground visual is a 120x120 plane; the long route needs more.
+## Collision is an infinite WorldBoundaryShape3D, so only the visual moves.
+func _stretch_ground() -> void:
+	var ground := get_parent().get_node_or_null("Ground") as MeshInstance3D
+	if ground != null and ground.mesh is PlaneMesh:
+		var pm := ground.mesh as PlaneMesh
+		pm.size = Vector2(120, 560)
+		ground.position = Vector3(0, 0, -214) # Covers z +66 .. -494.
 
 
 ## P20: build the pergola — posts you climb, a slab underside you run on.
@@ -95,6 +114,9 @@ func _spawn_hazard(spawn: Dictionary) -> void:
 		return
 	var hazard: Area3D = (load(script_path) as Script).new()
 	hazard.position = spawn.get("pos", Vector3.ZERO)
+	# P21: difficulty curve — the data can tighten a hazard's telegraph.
+	if spawn.has("warn") and hazard is HazardBase:
+		(hazard as HazardBase).warn_time = float(spawn["warn"])
 	# Stable names (FootstepA, Bicycle, ...) so tests and debuggers can
 	# find them under Level/.
 	var count: int = int(_type_counts.get(type, 0)) + 1
