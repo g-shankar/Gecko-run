@@ -15,18 +15,9 @@ const HAZARD_SCRIPTS := {
 	"car": "res://scripts/systems/car.gd",
 }
 
-const HAZARD_NAMES := {
-	"shield": "ShieldPickup",
-	"footstep": "Footstep", # + A/B/C per instance.
-	"bicycle": "Bicycle",
-	"bird": "Bird",
-	"car": "BackingCar",
-}
-
 @export var level_data: Resource ## A LevelData (level_data.gd). Null = default route.
 
 var spawned: Array[Node3D] = [] ## Every hazard/pickup this level created.
-var _type_counts := {} ## How many of each type spawned (for A/B names).
 
 
 func _ready() -> void:
@@ -46,14 +37,7 @@ func _spawn_hazard(spawn: Dictionary) -> void:
 		return
 	var hazard: Area3D = (load(script_path) as Script).new()
 	hazard.position = spawn.get("pos", Vector3.ZERO)
-	# Stable names (FootstepA, Bicycle, ...) so tests and debuggers can
-	# find them under Level/.
-	var count: int = int(_type_counts.get(type, 0)) + 1
-	_type_counts[type] = count
-	var base_name: String = HAZARD_NAMES.get(type, type.capitalize())
-	if count > 1 or type == "footstep":
-		base_name += String.chr(64 + count) # A, B, C...
-	hazard.name = base_name
+	hazard.name = "%s_%s" % [type.capitalize(), str(spawn.get("pos", Vector3.ZERO))]
 	add_child(hazard)
 	spawned.append(hazard)
 
