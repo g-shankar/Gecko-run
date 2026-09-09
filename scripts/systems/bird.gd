@@ -15,6 +15,17 @@ var _shadow: MeshInstance3D
 var _shadow_mat: StandardMaterial3D
 var _target_x: float = 0.0
 var _circle_t: float = 0.0
+## P27: while the gecko is camouflaged the bird never commits — it keeps
+## circling overhead instead of telegraphing/diving. (The base class also
+## skips the hit itself, so camo is airtight even mid-dive.)
+var _camo_hold: bool = false
+
+
+## P27: does the gecko currently have camouflage up?
+func _gecko_camouflaged() -> bool:
+	var gecko := get_tree().get_first_node_in_group("gecko")
+	return gecko != null and gecko.has_method("is_camouflaged") \
+		and bool(gecko.call("is_camouflaged"))
 
 
 func _ready() -> void:
@@ -85,6 +96,11 @@ func _build_primitive_bird() -> void:
 
 
 func _on_telegraph() -> void:
+	if _gecko_camouflaged(): ## P27: camouflaged — no lock-on, no shadow, no dive.
+		_camo_hold = true
+		_shadow.visible = false
+		return
+	_camo_hold = false
 	var gecko := get_tree().get_first_node_in_group("gecko") as Node3D
 	if gecko != null:
 		_target_x = clampf(gecko.global_position.x, -3.0, 3.0)
@@ -92,15 +108,23 @@ func _on_telegraph() -> void:
 
 
 func _on_idle() -> void:
+	_camo_hold = false ## P27.
 	_shadow.visible = false
 
 
 func _on_recover() -> void:
+	_camo_hold = false ## P27.
 	_shadow.visible = false
 
 
 func _tick_phase(delta: float) -> void:
 	_circle_t += delta
+	if _camo_hold and (phase == Phase.TELEGRAPH or phase == Phase.ACTIVE):
+		# P27: camouflaged gecko — hold the circle, never dive.
+		_bird.position = Vector3(
+			sin(_circle_t * 1.5) * 2.5, circle_height, cos(_circle_t * 1.1) * 2.0)
+		_bird.rotation_degrees.z = 0.0
+		return
 	if phase == Phase.IDLE:
 		# Circle overhead, waiting.
 		_bird.position = Vector3(

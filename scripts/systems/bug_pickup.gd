@@ -22,6 +22,7 @@ var _collected: bool = false
 
 
 func _ready() -> void:
+	add_to_group("bug") ## P27: the tongue finds bugs through this group.
 	_build()
 	_base_y = position.y
 	_bob_phase = randf() * TAU
@@ -79,10 +80,22 @@ func _on_body_entered(body: Node3D) -> void:
 		return
 	if not body.is_in_group("gecko"):
 		return
+	_collect(Color(0.4, 1.0, 0.3)) ## P22: green pop.
+
+
+## P27: eat this bug without touching it — the super tongue's path. Same
+## reward as walking into it, so the tongue is never a worse deal.
+func collect_remote() -> void:
+	_collect(Color(1.0, 0.45, 0.3)) ## Tongue-red pop.
+
+
+func _collect(burst_color: Color) -> void:
+	if _collected:
+		return
 	_collected = true
 	collected.emit()
 	var gs := get_tree().root.get_node_or_null("GameState")
 	if gs != null and gs.has_method("collect_bug"):
 		gs.collect_bug()
-	FX.burst(get_tree().root, global_position, Color(0.4, 1.0, 0.3)) ## P22: green pop.
+	FX.burst(get_tree().root, global_position, burst_color)
 	queue_free()

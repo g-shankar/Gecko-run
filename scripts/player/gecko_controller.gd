@@ -89,6 +89,17 @@ var _speed_boost_timer: float = 0.0 ## P19: seconds of 1.5x speed left.
 var _speed_trail: MeshInstance3D ## P19: motion-streak visual during boost.
 const SPEED_BOOST_DURATION: float = 6.0 ## P19: boost length (s).
 const SPEED_BOOST_MULT: float = 1.5 ## P19: speed multiplier while boosted.
+## P27: camouflage — birds won't dive and ground hazards won't trigger while
+## active. The gecko goes semi-transparent so the player can see it working.
+var _camo_timer: float = 0.0 ## P27: seconds of camouflage left.
+const CAMO_DURATION: float = 5.0 ## P27: camo length (s).
+## P27: super tongue — eats every bug within TONGUE_RANGE meters.
+var _tongue_timer: float = 0.0 ## P27: tongue-flick visual lifetime.
+var _tongue_mesh: MeshInstance3D ## P27: the visible tongue flick.
+const TONGUE_RANGE: float = 6.0 ## P27: tongue eating radius (m).
+## P27: dev stats overlay. Hidden by default (F1 toggles) — it is a debug
+## tool, not part of the game UI.
+var _debug_hud: CanvasLayer
 var _spawn_pos: Vector3 ## P10: where a respawn puts you.
 var _last_dist: int = 0 ## P15: last distance banked into the score.
 var _respawn_timer: float = 0.0 ## P10: countdown while DEAD.
@@ -140,7 +151,10 @@ func _ready() -> void:
 	floor_snap_length = 0.15 # A little extra glue for wall adhesion (P5).
 	var hud := DebugHUDScript.new()
 	hud.setup(self)
+	hud.visible = false ## P27: dev stats behind a toggle, off by default.
+	_debug_hud = hud
 	add_child(hud)
+	_build_tongue() ## P27.
 
 
 ## P23: swap the capsule mesh for the Tripo hero gecko. The imported .glb
@@ -249,6 +263,18 @@ func _physics_process(delta: float) -> void:
 		if _speed_boost_timer <= 0.0:
 			_speed_boost_timer = 0.0
 			_speed_trail.visible = false
+	# P27: camouflage expiry.
+	if _camo_timer > 0.0:
+		_camo_timer -= delta
+		if _camo_timer <= 0.0:
+			_camo_timer = 0.0
+			_visual.transparency = 0.0
+	# P27: tongue-flick visual lifetime.
+	if _tongue_timer > 0.0:
+		_tongue_timer -= delta
+		if _tongue_timer <= 0.0:
+			_tongue_timer = 0.0
+			_tongue_mesh.visible = false
 	# P14: score = meters from the start line.
 	# P15: accumulate distance via add_score so near-miss bonuses persist.
 	var gs := _gs()
@@ -492,6 +518,66 @@ func give_speed_boost() -> void:
 	_speed_trail.visible = true
 
 
+## P27: grant camouflage (5 s). While active, hazards can't see the gecko:
+## hazard_base skips the hit and the bird holds its dive. Called by the
+## CAMO ability button (and nothing else — no camo pickups on the route).
+func give_camo() -> void:
+	_camo_timer = CAMO_DURATION
+	_visual.transparency = 0.55
+
+
+## P27: hazards ask this before hitting. True while the camo timer runs.
+func is_camouflaged() -> bool:
+	return _camo_timer > 0.0
+
+
+## P27: the super tongue — eats every bug within TONGUE_RANGE meters of the
+## gecko, wherever they hover. Called by the TONGUE ability button.
+func fire_tongue() -> void:
+	_tongue_timer = 0.3
+	_tongue_mesh.visible = true
+	for b in get_tree().get_nodes_in_group("bug"):
+		var b3 := b as Node3D
+		if b3 == null:
+			continue
+		if b3.global_position.distance_to(global_position) > TONGUE_RANGE:
+			continue
+		if b.has_method("collect_remote"):
+			b.call("collect_remote")
+	FX.burst(get_tree().root, global_position + Vector3(0, 0.6, -1.0),
+		Color(1.0, 0.35, 0.3))
+
+
+## P27: a quick red flick that sells the tongue. Points forward (-Z), lives
+## 0.3 s per fire_tongue().
+func _build_tongue() -> void:
+	_tongue_mesh = MeshInstance3D.new()
+	var tongue := BoxMesh.new()
+	tongue.size = Vector3(0.09, 0.09, 2.6)
+	_tongue_mesh.mesh = tongue
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(1.0, 0.3, 0.35, 1.0)
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_tongue_mesh.material_override = mat
+	_tongue_mesh.position = Vector3(0, 0.45, -1.4)
+	_tongue_mesh.visible = false
+	add_child(_tongue_mesh)
+
+
+## P27: show/hide the dev stats overlay. Off by default; F1 toggles.
+func set_debug_hud(v: bool) -> void:
+	if _debug_hud != null:
+		_debug_hud.visible = v
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if _debug_hud == null:
+		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		if (event as InputEventKey).keycode == KEY_F1:
+			set_debug_hud(not _debug_hud.visible)
+
+
 ## P19: current speed multiplier — 1.5 while boosted, 1.0 otherwise.
 func boost_multiplier() -> float:
 	return SPEED_BOOST_MULT if _speed_boost_timer > 0.0 else 1.0
@@ -552,6 +638,10 @@ func _respawn() -> void:
 	_shield_bubble.visible = false
 	_speed_boost_timer = 0.0 ## P19: boost does not survive death.
 	_speed_trail.visible = false
+	_camo_timer = 0.0 ## P27: camo does not survive death/respawn.
+	_visual.transparency = 0.0
+	_tongue_timer = 0.0 ## P27.
+	_tongue_mesh.visible = false
 	# P22: register_death() parked GameState in DEAD — the run resumes here.
 	var gs := _gs()
 	if gs != null and gs.has_method("respawn"):

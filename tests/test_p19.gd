@@ -107,7 +107,7 @@ func _initialize() -> void:
 
 	# --- 7: HUD indicator ---
 	var speed_label: Label = ui.get("_speed_label")
-	check(speed_label != null, "HUD SPEED! label exists")
+	check(speed_label != null, "HUD SPEED! label exists") ## P27: now "⚡ SPEED!".
 	if speed_label != null:
 		check(speed_label.visible, "SPEED! shows while boosted")
 		gecko.set("_speed_boost_timer", 0.05)

@@ -104,10 +104,10 @@ func _initialize() -> void:
 	gs.current_state = gs.State.RUNNING
 	for i in 5:
 		await process_frame
-	var tracker: Label = ui.get("_mission_label")
+	var tracker: Label = ui.get("_mission_body") ## P27: the mission panel body.
 	check(tracker != null, "HUD mission tracker label exists")
 	if tracker != null:
-		check(tracker.text.begins_with("BUGS"),
+		check(tracker.text.contains("Eat bugs"),
 			"tracker shows first incomplete mission (text='%s')" % tracker.text)
 	# Complete the bug mission and watch for the popup.
 	_completed.clear()

@@ -123,16 +123,29 @@ func _tick_phase(_delta: float) -> void:
 func _on_body_entered(body: Node3D) -> void:
 	if not body.is_in_group("gecko"):
 		return
+	if _gecko_camouflaged(): ## P27: camo — the hazard never sees the gecko.
+		return
 	if hits_always or phase == Phase.ACTIVE:
 		player_hit.emit()
 
 
 func _check_overlaps() -> void:
+	if _gecko_camouflaged(): ## P27.
+		return
 	if hits_always or phase == Phase.ACTIVE:
 		for body in get_overlapping_bodies():
 			if body.is_in_group("gecko"):
 				player_hit.emit()
 				break
+
+
+## P27: true while the gecko's camouflage timer runs. Centralized here so
+## every hazard (footstep, sprinkler, bicycle, car, bird) honors camo the
+## same way — the bird additionally holds its dive (see bird.gd).
+func _gecko_camouflaged() -> bool:
+	var gecko := get_tree().get_first_node_in_group("gecko")
+	return gecko != null and gecko.has_method("is_camouflaged") \
+		and bool(gecko.call("is_camouflaged"))
 
 
 ## --- Subclass hooks: override these, don't touch the machine above. ---
