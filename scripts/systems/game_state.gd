@@ -30,10 +30,15 @@ var bug_count: int = 0:
 		bug_count = value
 		bugs_changed.emit(bug_count)
 
+var max_lives: int = 3 ## P14: deaths per run before game over.
+
+var best_score: int = 0 ## P14: best distance, persisted.
+
 var run_time: float = 0.0
 
 
 func _ready() -> void:
+	_load_best()
 	reset_run()
 
 
@@ -50,6 +55,26 @@ func reset_run() -> void:
 	current_state = State.READY
 
 
+## P14: call when a run ends. Saves best.
+func finish_run() -> void:
+	if score > best_score:
+		best_score = score
+		_save_best()
+	current_state = State.FINISHED
+
+
+func _load_best() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load("user://gecko_run.cfg") == OK:
+		best_score = int(cfg.get_value("records", "best_score", 0))
+
+
+func _save_best() -> void:
+	var cfg := ConfigFile.new()
+	cfg.set_value("records", "best_score", best_score)
+	cfg.save("user://gecko_run.cfg")
+
+
 func start_run() -> void:
 	reset_run()
 	current_state = State.RUNNING
@@ -63,10 +88,6 @@ func register_death() -> void:
 func respawn() -> void:
 	# Instant respawn at last checkpoint; checkpoint logic lives in mission_director.
 	current_state = State.RUNNING
-
-
-func finish_run() -> void:
-	current_state = State.FINISHED
 
 
 func add_score(points: int) -> void:

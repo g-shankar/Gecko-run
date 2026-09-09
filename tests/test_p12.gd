@@ -34,6 +34,16 @@ func _init() -> void:
 		return
 	var main: Node = packed.instantiate()
 	root.add_child(main)
+	# P14: the GameState autoload starts in READY (start screen). Tests
+	# bypass it: wait a beat for it to load, then remove it so the gecko
+	# runs immediately (gs==null means "just run").
+	for _i in 10:
+		await process_frame
+		if root.has_node("GameState"):
+			break
+	var _gs: Node = root.get_node_or_null("GameState")
+	if _gs != null:
+		_gs.queue_free()
 	for i in 32:
 		await process_frame
 
