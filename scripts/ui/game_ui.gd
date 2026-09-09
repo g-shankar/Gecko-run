@@ -539,15 +539,16 @@ func _build_hud() -> void:
 	_hud.add_child(_timer_label)
 	_minimap = MinimapScript.new()
 	_minimap.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	_minimap.position = Vector2(-186, 14)
-	_minimap.custom_minimum_size = Vector2(170, 170)
-	_minimap.size = Vector2(170, 170)
+	_minimap.position = Vector2(-180, 10)
+	_minimap.custom_minimum_size = Vector2(160, 160)
+	_minimap.size = Vector2(160, 160)
 	_hud.add_child(_minimap)
-	# --- Right edge: the ability bar. 88px+ touch targets, charge badges. ---
+	# --- Right edge: the ability bar. 88px+ touch targets, charge badges.
+	# Sits just below the minimap (map bottom = y170, bar top = y170).
 	var abox := VBoxContainer.new()
 	abox.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
-	abox.position = Vector2(-116, -200)
-	abox.add_theme_constant_override("separation", 14)
+	abox.position = Vector2(-112, -190)
+	abox.add_theme_constant_override("separation", 12)
 	abox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hud.add_child(abox)
 	for def in ABILITY_DEFS:
