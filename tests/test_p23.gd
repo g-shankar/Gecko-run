@@ -97,12 +97,14 @@ func _initialize() -> void:
 	root.add_child(gs)
 	await process_frame
 
-	# --- 4: persistence ---
+	# --- 4: persistence (P26: versioned JSON profile replaced the cfg) ---
 	gs.set_skin(3)
 	check(int(gs.selected_skin) == 3, "set_skin(3) sticks")
-	var cfg := ConfigFile.new()
-	check(cfg.load("user://gecko_run.cfg") == OK, "cfg written")
-	check(int(cfg.get_value("records", "selected_skin", -1)) == 3, "selected_skin persisted as 3")
+	var pf := FileAccess.open("user://gecko_run_profile.json", FileAccess.READ)
+	check(pf != null, "profile written")
+	var pdata: Dictionary = JSON.parse_string(pf.get_as_text())
+	pf.close()
+	check(int(pdata.get("selected_skin", -1)) == 3, "selected_skin persisted as 3")
 
 	# --- 5: clamping ---
 	gs.set_skin(99)

@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player/gecko.tscn" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/player/camera_rig.tscn" id="2"]
@@ -10,6 +10,8 @@
 [ext_resource type="Script" path="res://scripts/systems/level.gd" id="8"]
 [ext_resource type="Script" path="res://scripts/ui/game_ui.gd" id="9"]
 [ext_resource type="Script" path="res://scripts/systems/backyard_art.gd" id="10"]
+[ext_resource type="Script" path="res://scripts/systems/atmosphere.gd" id="11"]
+[ext_resource type="Script" path="res://scripts/ui/frontend_ui.gd" id="12"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
 sky_top_color = Color(0.3, 0.52, 0.88, 1)
@@ -143,7 +145,10 @@ script = ExtResource("9")
 
 [node name="BackyardArt" type="Node3D" parent="."]
 script = ExtResource("10")
-# Note: the rig auto-discovers its target via the "gecko" group (see
-# camera_rig.gd). A `target = NodePath("../Gecko")` override does NOT work
-# here -- Godot 4 does not reliably resolve NodePath overrides that point
-# outside an instanced scene -- so it is intentionally left unwired.
+
+[node name="Atmosphere" type="Node3D" parent="."]
+script = ExtResource("11")
+
+[node name="FrontendUI" type="CanvasLayer" parent="."]
+layer = 5
+script = ExtResource("12")

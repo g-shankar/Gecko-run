@@ -58,11 +58,24 @@ var best_score: int = 0 ## P14: best score, persisted. P22: was mislabeled "dist
 
 var selected_skin: int = 0 ## P23: hero skin index, persisted.
 
+## P26: player profile — local save on device, no server account yet.
+## Versioned JSON so future updates can migrate old saves.
+const PROFILE_VERSION: int = 1
+var profile_path: String = "user://gecko_run_profile.json" ## var: tests isolate.
+var player_name: String = "" ## Empty = first launch: ask for a name.
+var total_runs: int = 0
+var total_bugs: int = 0
+var total_near_miss: int = 0
+var missions_completed_total: int = 0
+var map_best := {} ## map_id -> best score on that map.
+var current_map_id: String = "florida_backyard" ## P26: which map is loaded.
+var return_to: String = "menu" ## P26: "maps" = game over should land on map select.
+
 var run_time: float = 0.0
 
 
 func _ready() -> void:
-	_load_best()
+	_load_profile()
 	reset_run()
 
 
@@ -117,32 +130,100 @@ func _update_missions() -> void:
 			mission_completed.emit(String(m["id"]))
 
 
-## P14: call when a run ends. Saves best.
+## P14: call when a run ends. Saves best and records profile stats (P26).
 func finish_run() -> void:
 	if score > best_score:
 		best_score = score
-		_save_best()
+	record_run_end() ## P26: totals, per-map best, persist.
 	current_state = State.FINISHED
 
 
-func _load_best() -> void:
+## P26: load the versioned profile; migrate the legacy cfg on first run.
+func _load_profile() -> void:
+	player_name = ""
+	total_runs = 0
+	total_bugs = 0
+	total_near_miss = 0
+	missions_completed_total = 0
+	map_best = {}
+	if FileAccess.file_exists(profile_path):
+		var f := FileAccess.open(profile_path, FileAccess.READ)
+		if f != null:
+			var data: Variant = JSON.parse_string(f.get_as_text())
+			f.close()
+			if typeof(data) == TYPE_DICTIONARY and int(data.get("version", 0)) == PROFILE_VERSION:
+				player_name = String(data.get("player_name", ""))
+				selected_skin = clampi(int(data.get("selected_skin", 0)), 0, 4)
+				best_score = int(data.get("best_score", 0))
+				total_runs = int(data.get("total_runs", 0))
+				total_bugs = int(data.get("total_bugs", 0))
+				total_near_miss = int(data.get("total_near_miss", 0))
+				missions_completed_total = int(data.get("missions_completed_total", 0))
+				map_best = data.get("map_best", {})
+				if typeof(map_best) != TYPE_DICTIONARY:
+					map_best = {}
+				return
+	_migrate_legacy_profile()
+
+
+## P26: first run with the new system — carry best_score/selected_skin over
+## from the old ConfigFile save, then write the fresh JSON profile.
+func _migrate_legacy_profile() -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load("user://gecko_run.cfg") == OK:
 		best_score = int(cfg.get_value("records", "best_score", 0))
-		selected_skin = clampi(int(cfg.get_value("records", "selected_skin", 0)), 0, 4) ## P23.
+		selected_skin = clampi(int(cfg.get_value("records", "selected_skin", 0)), 0, 4)
+	save_profile()
 
 
-func _save_best() -> void:
-	var cfg := ConfigFile.new()
-	cfg.set_value("records", "best_score", best_score)
-	cfg.set_value("records", "selected_skin", selected_skin) ## P23.
-	cfg.save("user://gecko_run.cfg")
+func save_profile() -> void:
+	var data := {
+		"version": PROFILE_VERSION,
+		"player_name": player_name,
+		"selected_skin": selected_skin,
+		"best_score": best_score,
+		"total_runs": total_runs,
+		"total_bugs": total_bugs,
+		"total_near_miss": total_near_miss,
+		"missions_completed_total": missions_completed_total,
+		"map_best": map_best,
+	}
+	var f := FileAccess.open(profile_path, FileAccess.WRITE)
+	if f != null:
+		f.store_string(JSON.stringify(data))
+		f.close()
+
+
+## P26: set the player name (first launch / rename). Never blank.
+func set_player_name(n: String) -> void:
+	var clean := n.strip_edges().left(12)
+	if clean.is_empty():
+		clean = "GECKO"
+	player_name = clean
+	save_profile()
+
+
+## P26: fold one finished run into the lifetime stats and persist.
+func record_run_end() -> void:
+	total_runs += 1
+	total_bugs += bug_count
+	total_near_miss += near_miss_count
+	var done := 0
+	for m in missions:
+		if bool(m["done"]):
+			done += 1
+	missions_completed_total += done
+	var prev := int(map_best.get(current_map_id, 0))
+	if score > prev:
+		map_best[current_map_id] = score
+	save_profile()
 
 
 ## P23: pick a hero skin; persists immediately so the choice survives.
+## P26: persists through the versioned profile, not the legacy cfg.
 func set_skin(index: int) -> void:
 	selected_skin = clampi(index, 0, 4)
-	_save_best()
+	save_profile()
 
 
 func start_run() -> void:

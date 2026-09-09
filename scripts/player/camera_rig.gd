@@ -100,3 +100,12 @@ func _process(delta: float) -> void:
 ## near-miss with 0.35.
 func add_trauma(amount: float) -> void:
 	_trauma = clampf(_trauma + amount, 0.0, 1.0)
+
+
+## P26: run-start arrival. Pop the camera high-behind the gecko; the normal
+## follow glide settles it into the chase position over ~0.7 s — a gentle
+## opening sweep with no new state and no extra code paths in _process.
+func intro_sweep() -> void:
+	if target == null:
+		return
+	global_position = target.global_position + Vector3(0.0, 4.2, 3.2)

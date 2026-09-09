@@ -23,7 +23,7 @@ func _ready() -> void:
 	_paint_ground()
 	_paint_fence()
 	_paint_planters()
-	_paint_pergola()
+	paint_pergola()
 
 
 ## Blue Florida sky, warm haze at the horizon, sky-sourced ambient light,
@@ -225,7 +225,7 @@ func _make_plant(mat: Material) -> Node3D:
 
 
 ## The P20 pergola keeps its climbable boxes; they just look like wood now.
-func _paint_pergola() -> void:
+func paint_pergola() -> void:
 	var level := get_parent().get_node_or_null("Level")
 	if level == null:
 		return

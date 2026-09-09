@@ -28,7 +28,15 @@ func _init() -> void:
 		return
 	var main: Node = packed.instantiate()
 	root.add_child(main)
-	for i in 32:
+	for i in 4:
+		await process_frame
+	# P26: the first-launch name entry sits in front of the menu, and the
+	# manual node's _ready (deferred this early) reloads the profile after
+	# any in-memory name is set. So name it here, then re-run the
+	# frontend's READY routing — exactly what a returning player sees.
+	gs.set("player_name", "P14")
+	(main.get_node("FrontendUI") as Node).call("_on_state_changed", gs.State.READY)
+	for i in 28:
 		await process_frame
 
 	var ui: CanvasLayer = main.get_node("GameUI")

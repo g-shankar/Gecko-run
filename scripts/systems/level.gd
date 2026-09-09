@@ -41,15 +41,58 @@ var _type_counts := {} ## How many of each type spawned (for A/B names).
 
 
 func _ready() -> void:
+	add_to_group("level") ## P26: the frontend finds the level here.
 	if level_data == null:
 		var script: Script = load("res://scripts/systems/level_data.gd")
 		level_data = script.new() # Default route: Backyard 1.
+	_build_all()
+
+
+## P26: swap the whole route at runtime (map select). Clears every spawned
+## hazard plus the pergola/start-line build products, then rebuilds from
+## the new route script. Collision, spawn and timing logic are untouched —
+## only WHICH route data feeds them changes.
+func load_route(route_script: String) -> void:
+	_clear_route()
+	var script: Script = load(route_script)
+	if script == null:
+		push_warning("Level: unknown route script '%s'." % route_script)
+		return
+	level_data = script.new()
+	_build_all()
+
+
+## P26: tear down a built route. Immediate free() (not queue_free) so a
+## same-frame rebuild never sees stale siblings or duplicate node names.
+## Called from UI context, never from inside physics — safe.
+func _clear_route() -> void:
+	for h in spawned:
+		if is_instance_valid(h):
+			h.free()
+	spawned.clear()
+	_type_counts.clear()
+	for n in ["Pergola", "StartLine"]:
+		var old := get_node_or_null(n)
+		if old != null:
+			old.free()
+
+
+func _build_all() -> void:
 	_build_start_line()
 	for spawn in (level_data.get("spawns") as Array):
 		_spawn_hazard(spawn)
 	_build_ceiling_route() ## P20: pergola with the climbable ceiling.
 	_place_fence() ## P21: the fence stands at the route's end.
 	_stretch_ground() ## P21: the visual ground must cover the long route.
+	_repaint_pergola() ## P26: re-apply the wood skin after a rebuild.
+
+
+## P26: BackyardArt paints the pergola once at startup; after a route swap
+## the new pergola needs the same treatment.
+func _repaint_pergola() -> void:
+	var art := get_parent().get_node_or_null("BackyardArt")
+	if art != null and art.has_method("paint_pergola"):
+		art.paint_pergola()
 
 
 ## P21: the fence is the finish gate — park it at the data's fence_z.

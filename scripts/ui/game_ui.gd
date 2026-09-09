@@ -14,9 +14,14 @@ extends CanvasLayer
 
 func _gs() -> Node:
 	return get_tree().root.get_node_or_null("GameState")
+
+
+func _fe() -> Node:
+	return get_tree().get_first_node_in_group("frontend_ui")
 ##   process_mode = ALWAYS so buttons still work while paused.
 
-var _start_screen: Control
+var _start_screen: Control ## P26: the main menu (title + PLAY/GECKOS/PROFILE).
+var _menu_player_label: Label ## P26: "GECKO · BEST 1234" chip on the menu.
 var _hud: Control
 var _pause_menu: Control
 var _game_over: Control
@@ -30,13 +35,13 @@ var _mission_label: Label ## P18: mission tracker ("BUGS 7/15").
 var _mission_popup_label: Label ## P18: "MISSION COMPLETE!" popup.
 var _mission_popup_timer: float = 0.0
 var _speed_label: Label ## P19: "SPEED!" indicator while boosted.
-var _skin_buttons: Array = [] ## P23: character-select swatches.
 var _final_score_label: Label
 var _best_label: Label
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	add_to_group("game_ui") ## P26: the frontend hides this menu under its screens.
 	_build_start_screen()
 	_build_hud()
 	_build_pause_menu()
@@ -58,7 +63,7 @@ func _ready() -> void:
 
 func _on_state_changed(new_state: int) -> void:
 	if new_state == _gs().State.READY:
-		_refresh_skin_buttons() ## P23: show the persisted choice.
+		_refresh_menu() ## P26: player chip on the main menu.
 		_show_only(_start_screen)
 	elif new_state == _gs().State.RUNNING:
 		_show_only(_hud)
@@ -143,6 +148,13 @@ func _show_only(panel: Control) -> void:
 		p.visible = (p == panel)
 
 
+## P26: the frontend calls this so its screens never double up with the
+## menu. State changes still route through _on_state_changed as before.
+func set_menu_hidden(hidden: bool) -> void:
+	if _start_screen != null:
+		_start_screen.visible = not hidden
+
+
 func _make_button(text: String) -> Button:
 	var b := Button.new()
 	b.text = text
@@ -166,83 +178,82 @@ func _full_rect(c: Control) -> void:
 	c.set_anchors_preset(Control.PRESET_FULL_RECT)
 
 
-# --- Start screen ---
+# --- Main menu (was the P14 start screen; P26 made it a real menu) ---
 
 func _build_start_screen() -> void:
 	_start_screen = Control.new()
 	_full_rect(_start_screen)
 	add_child(_start_screen)
-	var title := _make_label("GECKO RUN", 72)
+	var title := _make_label("GECKO RUN", 84)
 	title.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	title.position = Vector2(-200, 180)
-	title.size = Vector2(400, 100)
+	title.position = Vector2(-300, 120)
+	title.size = Vector2(600, 110)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_start_screen.add_child(title)
 	var sub := _make_label("A tiny gecko. A big backyard.", 28)
 	sub.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	sub.position = Vector2(-200, 280)
-	sub.size = Vector2(400, 40)
+	sub.position = Vector2(-300, 230)
+	sub.size = Vector2(600, 40)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_start_screen.add_child(sub)
-	var start_btn := _make_button("TAP TO START")
-	start_btn.set_anchors_preset(Control.PRESET_CENTER)
-	start_btn.position = Vector2(-140, -36)
-	start_btn.pressed.connect(_on_start_pressed)
-	_start_screen.add_child(start_btn)
-	_build_skin_select() ## P23: choose-your-gecko, below the start button.
+	_menu_player_label = _make_label("", 26)
+	_menu_player_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_menu_player_label.position = Vector2(-300, 280)
+	_menu_player_label.size = Vector2(600, 40)
+	_menu_player_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_start_screen.add_child(_menu_player_label)
+	var play_btn := _make_button("PLAY")
+	play_btn.set_anchors_preset(Control.PRESET_CENTER)
+	play_btn.position = Vector2(-160, -120)
+	play_btn.pressed.connect(_on_play_pressed)
+	_start_screen.add_child(play_btn)
+	var geckos_btn := _make_button("GECKOS")
+	geckos_btn.set_anchors_preset(Control.PRESET_CENTER)
+	geckos_btn.position = Vector2(-160, -20)
+	geckos_btn.pressed.connect(_on_geckos_pressed)
+	_start_screen.add_child(geckos_btn)
+	var profile_btn := _make_button("PROFILE")
+	profile_btn.set_anchors_preset(Control.PRESET_CENTER)
+	profile_btn.position = Vector2(-160, 80)
+	profile_btn.pressed.connect(_on_profile_pressed)
+	_start_screen.add_child(profile_btn)
 
 
-func _on_start_pressed() -> void:
-	_gs().current_state = _gs().State.RUNNING
-
-
-# --- P23: character select ---
-
-## Five tappable swatches on the start screen. Touch-native Buttons; the
-## selected one gets a ▶ marker. Persists via GameState and applies live.
-func _build_skin_select() -> void:
-	var label := _make_label("CHOOSE YOUR GECKO", 24)
-	label.set_anchors_preset(Control.PRESET_CENTER)
-	label.position = Vector2(-200, 70)
-	label.size = Vector2(400, 36)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_start_screen.add_child(label)
-	var row := HBoxContainer.new()
-	row.set_anchors_preset(Control.PRESET_CENTER)
-	row.position = Vector2(-265, 112)
-	row.size = Vector2(530, 64)
-	row.add_theme_constant_override("separation", 6)
-	_start_screen.add_child(row)
-	_skin_buttons.clear()
-	for i in GeckoSkins.count():
-		var b := Button.new()
-		b.custom_minimum_size = Vector2(100, 60)
-		b.add_theme_font_size_override("font_size", 18)
-		b.add_theme_color_override("font_color", GeckoSkins.skin_tint(i).lightened(0.35))
-		b.pressed.connect(_on_skin_pressed.bind(i))
-		row.add_child(b)
-		_skin_buttons.append(b)
-	_refresh_skin_buttons()
-
-
-func _on_skin_pressed(index: int) -> void:
+## P26: player chip on the menu. Empty name (first launch) hides the chip —
+## the frontend's name entry is showing on top anyway.
+func _refresh_menu() -> void:
 	var gs := _gs()
 	if gs == null:
 		return
-	gs.set_skin(index)
-	var gecko := get_tree().get_first_node_in_group("gecko")
-	if gecko != null and gecko.has_method("apply_selected_skin"):
-		gecko.apply_selected_skin()
-	_refresh_skin_buttons()
+	var n := String(gs.get("player_name"))
+	if n.is_empty():
+		_menu_player_label.text = ""
+	else:
+		_menu_player_label.text = "🦎  %s   ·   BEST %d PTS" % [n, int(gs.get("best_score"))]
 
 
-func _refresh_skin_buttons() -> void:
-	var gs := _gs()
-	var sel := int(gs.selected_skin) if gs != null else 0
-	for i in _skin_buttons.size():
-		var b := _skin_buttons[i] as Button
-		var mark := "▶ " if i == sel else ""
-		b.text = mark + GeckoSkins.skin_short(i)
+func _on_play_pressed() -> void:
+	var fe := _fe()
+	if fe != null and fe.has_method("show_journey"):
+		fe.call("show_journey")
+
+
+func _on_geckos_pressed() -> void:
+	var fe := _fe()
+	if fe != null and fe.has_method("show_geckos"):
+		fe.call("show_geckos")
+
+
+func _on_profile_pressed() -> void:
+	var fe := _fe()
+	if fe != null and fe.has_method("show_profile"):
+		fe.call("show_profile")
+
+
+## P14: kept for the UI-driven start path (and its test). The frontend's
+## map cards go through FrontendUI.start_map, which also ends up here.
+func _on_start_pressed() -> void:
+	_gs().current_state = _gs().State.RUNNING
 
 
 # --- HUD ---
@@ -386,9 +397,15 @@ func _build_game_over() -> void:
 	_game_over.add_child(_best_label)
 	var restart_btn := _make_button("RUN AGAIN")
 	restart_btn.set_anchors_preset(Control.PRESET_CENTER)
-	restart_btn.position = Vector2(-140, 60)
+	restart_btn.position = Vector2(-140, 40)
 	restart_btn.pressed.connect(_on_restart_pressed)
 	_game_over.add_child(restart_btn)
+	# P26: results -> map select, not a dead end.
+	var maps_btn := _make_button("MAPS")
+	maps_btn.set_anchors_preset(Control.PRESET_CENTER)
+	maps_btn.position = Vector2(-140, 140)
+	maps_btn.pressed.connect(_on_maps_pressed)
+	_game_over.add_child(maps_btn)
 
 
 func _update_game_over() -> void:
@@ -402,3 +419,13 @@ func _restart_run() -> void:
 		gecko.reset_for_new_run()
 	_gs().reset_run()
 	_gs().current_state = _gs().State.RUNNING
+
+
+## P26: game over -> map select. The frontend lands on the map screen
+## (GameState.return_to) instead of the main menu.
+func _on_maps_pressed() -> void:
+	var gecko := get_tree().get_first_node_in_group("gecko")
+	if gecko != null and gecko.has_method("reset_for_new_run"):
+		gecko.reset_for_new_run()
+	_gs().return_to = "maps"
+	_gs().reset_run()
