@@ -34,6 +34,12 @@ class_name LevelData
 	{ "type": "footstep", "pos": Vector3(0, 0, -15) },
 	{ "type": "bug", "pos": Vector3(0, 0.8, -16) },
 	{ "type": "bug", "pos": Vector3(0, 0.8, -17) },
+	{ "type": "bug", "pos": Vector3(2.2, 1.8, -17.3) },
+	{ "type": "bug", "pos": Vector3(-2.2, 1.8, -17.3) },
+	{ "type": "bug", "pos": Vector3(2.2, 1.8, -17.6) },
+	{ "type": "bug", "pos": Vector3(-2.2, 1.8, -17.6) },
+	{ "type": "bug", "pos": Vector3(2.2, 1.8, -17.9) },
+	{ "type": "bug", "pos": Vector3(-2.2, 1.8, -17.9) },
 	{ "type": "speed", "pos": Vector3(-2.0, 0, -18) },
 	{ "type": "car", "pos": Vector3(6, 0, -19) },
 ]
