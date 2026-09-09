@@ -56,3 +56,28 @@ static func apply_skin(mi: MeshInstance3D, index: int) -> void:
 		mi.set_meta(_MAT_META, mat)
 		mi.set_surface_override_material(0, mat)
 	mat.albedo_color = SKINS[i]["tint"] as Color
+
+
+## Apply a skin to every part mesh of an articulated rig. Each part gets
+## its own duplicated material (cached in metadata), so the tint is
+## uniform across the segmented body.
+static func apply_skin_rigged(meshes: Array, index: int) -> void:
+	var i: int = clampi(index, 0, SKINS.size() - 1)
+	var tint: Color = SKINS[i]["tint"] as Color
+	for mi in meshes:
+		if not (mi is MeshInstance3D):
+			continue
+		var m := mi as MeshInstance3D
+		if m.mesh == null:
+			continue
+		var mat: StandardMaterial3D = null
+		if m.has_meta(_MAT_META):
+			mat = m.get_meta(_MAT_META) as StandardMaterial3D
+		if mat == null:
+			var src := m.mesh.surface_get_material(0) as StandardMaterial3D
+			if src == null:
+				continue
+			mat = src.duplicate() as StandardMaterial3D
+			m.set_meta(_MAT_META, mat)
+			m.set_surface_override_material(0, mat)
+		mat.albedo_color = tint

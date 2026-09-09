@@ -124,7 +124,11 @@ var _dash_requested: bool = false ## P8: set by the mobile dash button.
 ## gecko's up and local Z is lateral.
 @onready var _visual: MeshInstance3D = $MeshInstance3D
 var _squash_tween: Tween ## P22: the active scale-recovery tween, if any.
-var _animator: GeckoAnimator ## P28.5: procedural run cycle (no rig).
+var _animator: GeckoAnimator ## P28.5: procedural run cycle (articulated rig).
+## Articulated rig state: part meshes + pivots from GeckoRig.build().
+## Empty when segmentation failed (rigid fallback: hero mesh on _visual).
+var _rig_meshes: Array = []
+var _rig_pivots: Dictionary = {}
 
 ## P23: the Tripo hero gecko (decimated to ~9.6k verts). Only the mesh is
 ## swapped — the CharacterBody3D, collision capsule and this script stay.
@@ -140,11 +144,11 @@ func _ready() -> void:
 	_ensure_input_actions()
 	_spawn_pos = global_position
 	_last_dist = 0
-	_swap_hero_mesh() ## P23: capsule visual -> Tripo gecko (fallback: capsule).
-	_animator = GeckoAnimator.new() ## P28.5: procedural run cycle, no rig.
-	_animator.setup(self, _visual)
+	_swap_hero_mesh() ## Articulated rig (fallback: rigid hero / capsule).
+	_animator = GeckoAnimator.new() ## Articulated run cycle on the rig.
+	_animator.setup(self, _visual, _rig_pivots)
 	add_child(_animator)
-	GeckoSkins.apply_skin(_visual, _selected_skin()) ## P23: persisted choice.
+	apply_selected_skin() ## P23: persisted choice, across all rig parts.
 	_build_shield_bubble()
 	_build_speed_trail() ## P19.
 	_build_rim_light() ## P28.5+: subtle rim so the hero reads first.
@@ -162,17 +166,31 @@ func _ready() -> void:
 	_build_tongue() ## P27.
 
 
-## P23: swap the capsule mesh for the Tripo hero gecko. The imported .glb
+## Build the articulated rig from the Tripo hero mesh. The imported .glb
 ## is a PackedScene (not a Mesh), so we instance it once, steal the
 ## ArrayMesh (its surface material carries the PBR textures), and free it.
-## If anything fails, the capsule stays — the game never breaks.
+## GeckoRig segments the static mesh into 9 pivoted parts (body, head,
+## 3 tail, 4 legs). If anything fails, the full hero mesh goes on the
+## visual (rigid fallback) — and if THAT fails, the capsule stays.
 func _swap_hero_mesh() -> void:
 	var inst: Node = HERO_SCENE.instantiate()
 	var hero_mi := _find_first_mesh(inst)
+	var hero_mesh: ArrayMesh = null
 	if hero_mi != null and hero_mi.mesh != null:
-		_visual.mesh = hero_mi.mesh
-		_visual.scale = Vector3.ONE * VISUAL_BASE_SCALE
+		hero_mesh = hero_mi.mesh as ArrayMesh
 	inst.queue_free()
+	if hero_mesh != null:
+		var rig := GeckoRig.build(hero_mesh)
+		if not rig.is_empty():
+			_visual.mesh = null
+			_visual.add_child(rig["root"])
+			_rig_meshes = rig["meshes"]
+			_rig_pivots = rig["pivots"]
+			_visual.scale = Vector3.ONE * VISUAL_BASE_SCALE
+			return
+	if hero_mesh != null:
+		_visual.mesh = hero_mesh
+		_visual.scale = Vector3.ONE * VISUAL_BASE_SCALE
 
 
 func _find_first_mesh(n: Node) -> MeshInstance3D:
@@ -194,8 +212,20 @@ func _selected_skin() -> int:
 
 
 ## P23: re-apply the skin live (character select on the start screen).
+## Covers the articulated rig (every part) or the rigid mesh.
 func apply_selected_skin() -> void:
-	GeckoSkins.apply_skin(_visual, _selected_skin())
+	if not _rig_meshes.is_empty():
+		GeckoSkins.apply_skin_rigged(_rig_meshes, _selected_skin())
+	else:
+		GeckoSkins.apply_skin(_visual, _selected_skin())
+
+
+## Camouflage transparency: applies to the visual and every rig part
+## mesh (transparency does not inherit to child GeometryInstances).
+func _set_camo_transparency(t: float) -> void:
+	_visual.transparency = t
+	for mi in _rig_meshes:
+		(mi as GeometryInstance3D).transparency = t
 
 
 ## Touch controls for the phone playtest builds — Subway Surfers grammar:
@@ -273,7 +303,7 @@ func _physics_process(delta: float) -> void:
 		_camo_timer -= delta
 		if _camo_timer <= 0.0:
 			_camo_timer = 0.0
-			_visual.transparency = 0.0
+			_set_camo_transparency(0.0)
 	# P27: tongue-flick visual lifetime.
 	if _tongue_timer > 0.0:
 		_tongue_timer -= delta
@@ -535,7 +565,7 @@ func give_speed_boost() -> void:
 ## CAMO ability button (and nothing else — no camo pickups on the route).
 func give_camo() -> void:
 	_camo_timer = CAMO_DURATION
-	_visual.transparency = 0.55
+	_set_camo_transparency(0.55)
 
 
 ## P27: hazards ask this before hitting. True while the camo timer runs.
@@ -669,7 +699,7 @@ func _respawn() -> void:
 	_speed_boost_timer = 0.0 ## P19: boost does not survive death.
 	_speed_trail.visible = false
 	_camo_timer = 0.0 ## P27: camo does not survive death/respawn.
-	_visual.transparency = 0.0
+	_set_camo_transparency(0.0)
 	_tongue_timer = 0.0 ## P27.
 	_tongue_mesh.visible = false
 	# P22: register_death() parked GameState in DEAD — the run resumes here.

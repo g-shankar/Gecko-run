@@ -113,10 +113,15 @@ func _run() -> void:
 	check(GeckoAnimator.STRIDE_MIN_HZ >= 1.0
 		and GeckoAnimator.STRIDE_MAX_HZ <= 4.0,
 		"stride 1.4-3.2 Hz scaled by speed (no vibration)")
-	for a in [GeckoAnimator.PITCH_AMP, GeckoAnimator.ROLL_AMP,
-			GeckoAnimator.YAW_AMP, GeckoAnimator.PADDLE_AMP]:
+	for a in [GeckoAnimator.PITCH_AMP, GeckoAnimator.ROLL_AMP]:
 		check(a > 0.0 and a <= 0.07 and is_finite(a),
 			"motion amplitude bounded (%.3f rad)" % a)
+	check(GeckoAnimator.LEG_SWING > 0.3 and GeckoAnimator.LEG_SWING < 0.9,
+		"leg swing amplitude real (%.2f rad)" % GeckoAnimator.LEG_SWING)
+	check(GeckoAnimator.TAIL_AMP > 0.1 and GeckoAnimator.TAIL_AMP < 0.5,
+		"tail wave amplitude real (%.2f rad)" % GeckoAnimator.TAIL_AMP)
+	check(GeckoAnimator.BOB_AMP <= 0.015,
+		"body bob small — limbs do the work (%.3f m)" % GeckoAnimator.BOB_AMP)
 	check(GeckoAnimator.BANK_MAX <= 0.35, "bank clamped (%.2f rad)"
 		% GeckoAnimator.BANK_MAX)
 	check(is_finite(GeckoAnimator.IDLE_YAW_AMP)
@@ -132,11 +137,20 @@ func _run() -> void:
 		"idle look-around drifts yaw when not running (%.3f rad)" % idle_yaw)
 	check(float(animator.get("_run_blend")) < 0.5, "run blend off in menu")
 
-	# --- 3: run cycle while RUNNING ---
+	# --- 3: run cycle while RUNNING (articulated rig) ---
 	gs.call("start_run")
 	gecko.global_position = Vector3(0, 0.2, -30) # empty track
 	gecko.call("give_camo") # hazards blind: the run phase stays clean
 	gecko.call("give_shield")
+	var rig_meshes: Array = gecko.get("_rig_meshes")
+	check(rig_meshes.size() == 9, "rig attached: 9 part meshes")
+	var rig_pivots: Dictionary = gecko.get("_rig_pivots")
+	check((rig_pivots["legs"] as Dictionary).size() == 4,
+		"4 leg pivots (LF/RF/LH/RH)")
+	check((rig_pivots["tail"] as Array).size() == 3,
+		"3 tail section pivots")
+	check(rig_pivots["head"] != null, "head pivot present")
+	check(bool(animator.get("_rigged")), "animator drives the rig")
 	for i in 30:
 		await process_frame
 	check(float(animator.get("_run_blend")) > 0.9, "run blend engages")
@@ -147,6 +161,47 @@ func _run() -> void:
 	check(float(ys.max()) - float(ys.min()) > 0.004,
 		"body bob active (travel %.4f m)" % (float(ys.max()) - float(ys.min())))
 	check(float(animator.get("_phase")) > 1.0, "stride phase advances")
+
+	# --- 3b: diagonal gait — LF+RH in phase, RF+LH antiphase ---
+	var legs: Dictionary = rig_pivots["legs"]
+	var tail: Array = rig_pivots["tail"]
+	var diag_ok := 0
+	var diag_n := 0
+	var tail0: float = (tail[0] as Node3D).rotation.y
+	var tail_moved := false
+	for i in 40:
+		await physics_frame
+		var lf: float = (legs["LF"] as Node3D).rotation.z
+		var rh: float = (legs["RH"] as Node3D).rotation.z
+		var rf: float = (legs["RF"] as Node3D).rotation.z
+		if signf(lf) == signf(rh) and signf(lf) != signf(rf):
+			diag_ok += 1
+		diag_n += 1
+		if absf((tail[0] as Node3D).rotation.y - tail0) > 0.02:
+			tail_moved = true
+	check(diag_ok > diag_n * 0.7,
+		"diagonal gait: LF+RH together, RF opposite (%d/%d)" % [diag_ok, diag_n])
+	check(tail_moved, "tail articulates with a traveling wave")
+	# Legs actually swing (not the old rigid paddle illusion).
+	var swing_seen := false
+	var lz0: float = (legs["LF"] as Node3D).rotation.z
+	for i in 20:
+		await physics_frame
+		if absf((legs["LF"] as Node3D).rotation.z - lz0) > 0.15:
+			swing_seen = true
+	check(swing_seen, "leg pivots swing through a real stride")
+
+	# --- 3c: airborne pose — legs trail, tail streams (real jumps only) ---
+	gecko.set("velocity", Vector3(0, 5, -9))
+	for i in 15:
+		await physics_frame
+	check(float(animator.get("_air_blend")) > 0.5, "airborne blend engages")
+	var lf_air: float = (legs["LF"] as Node3D).rotation.z
+	check(lf_air < -0.2,
+		"airborne legs trail back (%.2f rad)" % lf_air)
+	for i in 30: # land again
+		await physics_frame
+	check(float(animator.get("_air_blend")) < 0.5, "landing restores gait")
 
 	# --- 4: macro camera ---
 	check(absf(float(rig.get("follow_height")) - 0.62) < 0.01,
