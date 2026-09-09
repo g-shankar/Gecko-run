@@ -30,6 +30,7 @@ var _mission_label: Label ## P18: mission tracker ("BUGS 7/15").
 var _mission_popup_label: Label ## P18: "MISSION COMPLETE!" popup.
 var _mission_popup_timer: float = 0.0
 var _speed_label: Label ## P19: "SPEED!" indicator while boosted.
+var _skin_buttons: Array = [] ## P23: character-select swatches.
 var _final_score_label: Label
 var _best_label: Label
 
@@ -57,6 +58,7 @@ func _ready() -> void:
 
 func _on_state_changed(new_state: int) -> void:
 	if new_state == _gs().State.READY:
+		_refresh_skin_buttons() ## P23: show the persisted choice.
 		_show_only(_start_screen)
 	elif new_state == _gs().State.RUNNING:
 		_show_only(_hud)
@@ -187,10 +189,60 @@ func _build_start_screen() -> void:
 	start_btn.position = Vector2(-140, -36)
 	start_btn.pressed.connect(_on_start_pressed)
 	_start_screen.add_child(start_btn)
+	_build_skin_select() ## P23: choose-your-gecko, below the start button.
 
 
 func _on_start_pressed() -> void:
 	_gs().current_state = _gs().State.RUNNING
+
+
+# --- P23: character select ---
+
+## Five tappable swatches on the start screen. Touch-native Buttons; the
+## selected one gets a ▶ marker. Persists via GameState and applies live.
+func _build_skin_select() -> void:
+	var label := _make_label("CHOOSE YOUR GECKO", 24)
+	label.set_anchors_preset(Control.PRESET_CENTER)
+	label.position = Vector2(-200, 70)
+	label.size = Vector2(400, 36)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_start_screen.add_child(label)
+	var row := HBoxContainer.new()
+	row.set_anchors_preset(Control.PRESET_CENTER)
+	row.position = Vector2(-265, 112)
+	row.size = Vector2(530, 64)
+	row.add_theme_constant_override("separation", 6)
+	_start_screen.add_child(row)
+	_skin_buttons.clear()
+	for i in GeckoSkins.count():
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(100, 60)
+		b.add_theme_font_size_override("font_size", 18)
+		b.add_theme_color_override("font_color", GeckoSkins.skin_tint(i).lightened(0.35))
+		b.pressed.connect(_on_skin_pressed.bind(i))
+		row.add_child(b)
+		_skin_buttons.append(b)
+	_refresh_skin_buttons()
+
+
+func _on_skin_pressed(index: int) -> void:
+	var gs := _gs()
+	if gs == null:
+		return
+	gs.set_skin(index)
+	var gecko := get_tree().get_first_node_in_group("gecko")
+	if gecko != null and gecko.has_method("apply_selected_skin"):
+		gecko.apply_selected_skin()
+	_refresh_skin_buttons()
+
+
+func _refresh_skin_buttons() -> void:
+	var gs := _gs()
+	var sel := int(gs.selected_skin) if gs != null else 0
+	for i in _skin_buttons.size():
+		var b := _skin_buttons[i] as Button
+		var mark := "▶ " if i == sel else ""
+		b.text = mark + GeckoSkins.skin_short(i)
 
 
 # --- HUD ---

@@ -93,26 +93,29 @@ func _initialize() -> void:
 		"near-miss trauma is small (%.2f)" % nm_trauma)
 
 	# --- 5: jump stretches, then eases back ---
-	visual.scale = Vector3.ONE
+	# P23: the hero is rotated 90° about Y — local Y is up, so the takeoff
+	# stretch (height 1.3) lands on scale.y; rest pose is ONE * 0.85.
+	visual.scale = Vector3.ONE * 0.85
 	gecko.global_position = Vector3(0, 0.2, -30) # empty track
 	gecko.set("velocity", Vector3.ZERO)
 	await process_frame
 	gecko.call("_do_jump")
-	check(visual.scale.z > 1.1, "takeoff stretches the visual (%.2f)" % visual.scale.z)
+	check(visual.scale.y > 1.0, "takeoff stretches the visual (%.2f)" % visual.scale.y)
 	for i in 40:
 		await process_frame
-	check(visual.scale.distance_to(Vector3.ONE) < 0.05,
+	check(visual.scale.distance_to(Vector3.ONE * 0.85) < 0.05,
 		"visual eases back to normal after the stretch")
 
 	# --- 6: landing squashes (poll every frame to catch the 0.22 s tween) ---
+	# P23: the landing width (1.25) lands on local Z (lateral).
 	var squashed := false
 	gecko.global_position = Vector3(0, 3.0, -30)
 	gecko.set("velocity", Vector3.ZERO)
 	gecko.set("state", 1) # AIR
-	visual.scale = Vector3.ONE
+	visual.scale = Vector3.ONE * 0.85
 	for i in 120:
 		await process_frame
-		if visual.scale.x > 1.1:
+		if visual.scale.z > 0.95:
 			squashed = true
 			break
 		if (gecko as CharacterBody3D).is_on_floor() and i > 100:
