@@ -9,6 +9,7 @@ signal score_changed(new_score: int)
 signal bugs_changed(new_count: int)
 signal deaths_changed(new_count: int)
 signal near_misses_changed(new_count: int) ## P15: near-miss counter for UI.
+signal combo_changed(new_combo: int) ## P17: combo multiplier for UI.
 
 var current_state: State = State.READY:
 	set(value):
@@ -36,6 +37,15 @@ var near_miss_count: int = 0: ## P15: survived-it-close counter.
 		near_miss_count = value
 		near_misses_changed.emit(near_miss_count)
 
+var combo: int = 0: ## P17: consecutive scoring actions without dying.
+	set(value):
+		combo = value
+		combo_changed.emit(combo)
+
+var combo_timer: float = 0.0 ## P17: seconds left before combo expires.
+const COMBO_WINDOW: float = 4.0 ## P17: scoring actions refresh the combo.
+const COMBO_MAX: int = 8 ## P17: 8x is the ceiling.
+
 var max_lives: int = 3 ## P14: deaths per run before game over.
 
 var best_score: int = 0 ## P14: best distance, persisted.
@@ -51,6 +61,11 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if current_state == State.RUNNING:
 		run_time += delta
+		# P17: combo expires if no scoring action within the window.
+		if combo > 0:
+			combo_timer -= delta
+			if combo_timer <= 0.0:
+				combo = 0
 
 
 func reset_run() -> void:
@@ -58,6 +73,8 @@ func reset_run() -> void:
 	deaths = 0
 	bug_count = 0
 	near_miss_count = 0
+	combo = 0
+	combo_timer = 0.0
 	run_time = 0.0
 	current_state = State.READY
 
@@ -89,6 +106,8 @@ func start_run() -> void:
 
 func register_death() -> void:
 	deaths += 1
+	combo = 0 ## P17: death breaks the combo.
+	combo_timer = 0.0
 	current_state = State.DEAD
 
 
@@ -103,11 +122,25 @@ func add_score(points: int) -> void:
 
 func collect_bug() -> void:
 	bug_count += 1
-	add_score(10)
+	_bump_combo()
+	add_score(10 * _multiplier())
 
 
 ## P15: the gecko survived a hazard's ACTIVE phase from close range.
-## Worth 50 points — the "one more run" juice.
+## P17: worth 50 x combo multiplier — the "one more run" juice.
 func register_near_miss() -> void:
 	near_miss_count += 1
-	add_score(50)
+	_bump_combo()
+	add_score(50 * _multiplier())
+
+
+## P17: scoring actions build the combo (up to COMBO_MAX). Each action
+## refreshes the timer.
+func _bump_combo() -> void:
+	combo = mini(combo + 1, COMBO_MAX)
+	combo_timer = COMBO_WINDOW
+
+
+## P17: 1x for the first action, 2x for the second, etc.
+func _multiplier() -> int:
+	return maxi(1, combo)
