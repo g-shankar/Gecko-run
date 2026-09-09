@@ -964,7 +964,9 @@ func _paint_wet_driveway() -> void:
 	slab.mesh = pm
 	var mat := StandardMaterial3D.new()
 	mat.albedo_texture = _make_wet_concrete_texture()
-	mat.roughness = 0.12 ## P29: glossy wet look.
+	# P29: damp asphalt, not a mirror — 0.5 keeps the dark albedo visible
+	# while the sky sheen still reads "wet". The puddles do the mirroring.
+	mat.roughness = 0.5
 	mat.metallic = 0.0
 	## P29: Godot 4 has no specular property; the low roughness plus the
 	## bright sky ambient gives the sun glint on the wet concrete.
@@ -1007,7 +1009,7 @@ func _make_wet_concrete_texture() -> ImageTexture:
 		for x in n:
 			var mottle := _pvnoise(x / 34.0, y / 34.0, 311, 8, 8)
 			var grain := _hash(x, y, 317)
-			var v := 0.62 + (mottle - 0.5) * 0.55 + (grain - 0.5) * 0.22
+			var v := (0.62 + (mottle - 0.5) * 0.55 + (grain - 0.5) * 0.22) * 0.55
 			var c := Color(0.135 * v, 0.15 * v, 0.175 * v)
 			# Expansion joints: dark lines every 64 px.
 			if x % 64 < 2 or y % 64 < 2:
@@ -1040,9 +1042,9 @@ func _make_puddle_texture() -> ImageTexture:
 			var edge := clampf((1.0 - d) * 3.0, 0.0, 1.0) # Feathered rim.
 			var sky := 1.0 - float(y) / n # 1 at texture top = sky.
 			var c := Color(
-				lerpf(0.07, 0.52, sky * sky),
-				lerpf(0.09, 0.63, sky * sky),
-				lerpf(0.12, 0.78, sky * sky))
+				lerpf(0.10, 0.68, sky * sky),
+				lerpf(0.13, 0.78, sky * sky),
+				lerpf(0.17, 0.92, sky * sky))
 			img.set_pixel(x, y, Color(c.r, c.g, c.b, edge))
 	img.generate_mipmaps()
 	return ImageTexture.create_from_image(img)

@@ -146,8 +146,10 @@ func _run() -> void:
 		_check("DrivewaySlab present", slab != null)
 		if slab != null:
 			var smat := slab.material_override as StandardMaterial3D
-			_check("slab glossy (roughness %.2f <= 0.15)" % (smat.roughness if smat != null else -1.0),
-				smat != null and smat.roughness <= 0.15)
+			# P29: damp asphalt (0.45-0.6) — dark albedo shows; the sky
+			# sheen reads "wet" without turning the slab into a blue mirror.
+			_check("slab damp not mirror (roughness %.2f in 0.45..0.6)" % (smat.roughness if smat != null else -1.0),
+				smat != null and smat.roughness >= 0.45 and smat.roughness <= 0.6)
 		var puddles := _count_prefix(wet, "Puddle")
 		_check(">= 6 puddles on the driveway (%d)" % puddles, puddles >= 6)
 		var p1 := wet.get_node_or_null("Puddle1") as MeshInstance3D
