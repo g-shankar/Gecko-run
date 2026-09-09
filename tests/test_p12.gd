@@ -38,8 +38,8 @@ func _init() -> void:
 		await process_frame
 
 	var gecko: CharacterBody3D = main.get_node("Gecko")
-	var bird: Area3D = main.get_node("Bird")
-	var pickup: Area3D = main.get_node("ShieldPickup")
+	var bird: Area3D = main.get_node("Level/Bird")
+	var pickup: Area3D = main.get_node("Level/ShieldPickup")
 	check(gecko != null, "gecko present")
 	check(bird != null, "bird present")
 	check(pickup != null, "shield pickup present")
