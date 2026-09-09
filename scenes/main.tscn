@@ -5,6 +5,8 @@
 [ext_resource type="Script" path="res://scripts/systems/footstep.gd" id="3"]
 [ext_resource type="Script" path="res://scripts/systems/bicycle.gd" id="4"]
 [ext_resource type="Script" path="res://scripts/systems/car.gd" id="5"]
+[ext_resource type="Script" path="res://scripts/systems/bird.gd" id="6"]
+[ext_resource type="Script" path="res://scripts/systems/shield_pickup.gd" id="7"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
 sky_top_color = Color(0.3, 0.52, 0.88, 1)
@@ -131,6 +133,14 @@ script = ExtResource("4")
 [node name="BackingCar" type="Area3D" parent="."]
 position = Vector3(6, 0, -17)
 script = ExtResource("5")
+
+[node name="Bird" type="Area3D" parent="."]
+position = Vector3(0, 0, -11)
+script = ExtResource("6")
+
+[node name="ShieldPickup" type="Area3D" parent="."]
+position = Vector3(0, 0, -4)
+script = ExtResource("7")
 
 [node name="TestWall" type="StaticBody3D" parent="." groups=["climbable"]]
 position = Vector3(0, 2.5, -20)

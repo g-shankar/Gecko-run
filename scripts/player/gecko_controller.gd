@@ -69,6 +69,9 @@ var stat_jumps: int = 0
 var stat_last_peak: float = 0.0
 var stat_steer: float = 0.0
 var stat_deaths: int = 0 ## P10: times squashed.
+var shield_charges: int = 0 ## P12: hits the shield can still absorb.
+var _shield_timer: float = 0.0 ## P12: shield expiry countdown.
+var _shield_bubble: MeshInstance3D ## P12: the visible bubble.
 var _spawn_pos: Vector3 ## P10: where a respawn puts you.
 var _respawn_timer: float = 0.0 ## P10: countdown while DEAD.
 var _jump_start_y: float = 0.0
@@ -93,6 +96,7 @@ var _dash_requested: bool = false ## P8: set by the mobile dash button.
 func _ready() -> void:
 	_ensure_input_actions()
 	_spawn_pos = global_position
+	_build_shield_bubble()
 	# The feeler rays must ignore the gecko's own body, and their length
 	# follows the exported tuning (the .tscn value is only a default).
 	for ray: RayCast3D in [_wall_ray_l, _wall_ray_r]:
@@ -140,6 +144,12 @@ func _physics_process(delta: float) -> void:
 		_kick_timer -= delta
 	if _dash_cooldown > 0.0:
 		_dash_cooldown -= delta
+	# P12: shield expiry.
+	if shield_charges > 0:
+		_shield_timer -= delta
+		if _shield_timer <= 0.0:
+			shield_charges = 0
+			_shield_bubble.visible = false
 	# P10: while DEAD, just count down to respawn. No movement, no input.
 	if state == MoveState.DEAD:
 		_respawn_timer -= delta
@@ -279,14 +289,44 @@ func _apply_dash_movement(delta: float) -> void:
 
 ## P10: squashed. Freeze, flatten, count it, and come back in under a second.
 ## Idempotent: a second hit while already dead is ignored.
+## P12: if the shield has a charge, it absorbs the hit instead (no death).
 func die() -> void:
 	if state == MoveState.DEAD:
 		return
+	if shield_charges > 0:
+		shield_charges = 0
+		_shield_timer = 0.0
+		_shield_bubble.visible = false
+		return # Shield ate it. No death, no respawn.
 	state = MoveState.DEAD
 	stat_state = "DEAD"
 	stat_deaths += 1
 	_respawn_timer = 0.8
 	velocity = Vector3.ZERO
+
+
+## P12: grant one shield charge (10 s expiry). Called by shield pickups.
+func give_shield() -> void:
+	shield_charges = 1
+	_shield_timer = 10.0
+	_shield_bubble.visible = true
+
+
+## P12: the translucent bubble that says "you're protected."
+func _build_shield_bubble() -> void:
+	_shield_bubble = MeshInstance3D.new()
+	var bubble_mesh := SphereMesh.new()
+	bubble_mesh.radius = 0.65
+	bubble_mesh.height = 1.3
+	_shield_bubble.mesh = bubble_mesh
+	var bubble_mat := StandardMaterial3D.new()
+	bubble_mat.albedo_color = Color(0.3, 0.9, 1.0, 0.25)
+	bubble_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	bubble_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_shield_bubble.material_override = bubble_mat
+	_shield_bubble.position = Vector3(0, 0.5, 0)
+	_shield_bubble.visible = false
+	add_child(_shield_bubble)
 
 
 ## P10: back to the start, upright, running. Death-to-retry stays under a
@@ -302,6 +342,9 @@ func _respawn() -> void:
 	_adhere_cooldown = 0.0
 	_kick_timer = 0.0
 	_dash_cooldown = 0.0
+	shield_charges = 0
+	_shield_timer = 0.0
+	_shield_bubble.visible = false
 
 
 ## P8: the mobile dash button calls this (keyboard uses the "dash" action).
