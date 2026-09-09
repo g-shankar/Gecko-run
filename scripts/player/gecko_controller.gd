@@ -108,10 +108,17 @@ var _dash_cooldown: float = 0.0 ## P8: time until dash is available again.
 var _dash_requested: bool = false ## P8: set by the mobile dash button.
 
 ## P22: squash & stretch target the VISUAL only — the CollisionShape3D (the
-## hitbox) is a sibling, so it never pulses. The visual is rotated 90° about
-## X, so its local Z is the gecko's up.
+## hitbox) is a sibling, so it never pulses. P23: the visual is the Tripo
+## hero gecko, rotated 90° about Y to face -Z, so its local Y is the
+## gecko's up and local Z is lateral.
 @onready var _visual: MeshInstance3D = $MeshInstance3D
 var _squash_tween: Tween ## P22: the active scale-recovery tween, if any.
+
+## P23: the Tripo hero gecko (decimated to ~9.6k verts). Only the mesh is
+## swapped — the CharacterBody3D, collision capsule and this script stay.
+const HERO_SCENE: PackedScene = preload("res://assets/gecko/hero_gecko.glb")
+## P23: hero footprint vs the 0.5-wide collision capsule.
+const VISUAL_BASE_SCALE := 0.85
 
 @onready var _wall_ray_l: RayCast3D = $WallRayL
 @onready var _wall_ray_r: RayCast3D = $WallRayR
@@ -121,6 +128,8 @@ func _ready() -> void:
 	_ensure_input_actions()
 	_spawn_pos = global_position
 	_last_dist = 0
+	_swap_hero_mesh() ## P23: capsule visual -> Tripo gecko (fallback: capsule).
+	GeckoSkins.apply_skin(_visual, _selected_skin()) ## P23: persisted choice.
 	_build_shield_bubble()
 	_build_speed_trail() ## P19.
 	# The feeler rays must ignore the gecko's own body, and their length
@@ -132,6 +141,42 @@ func _ready() -> void:
 	var hud := DebugHUDScript.new()
 	hud.setup(self)
 	add_child(hud)
+
+
+## P23: swap the capsule mesh for the Tripo hero gecko. The imported .glb
+## is a PackedScene (not a Mesh), so we instance it once, steal the
+## ArrayMesh (its surface material carries the PBR textures), and free it.
+## If anything fails, the capsule stays — the game never breaks.
+func _swap_hero_mesh() -> void:
+	var inst: Node = HERO_SCENE.instantiate()
+	var hero_mi := _find_first_mesh(inst)
+	if hero_mi != null and hero_mi.mesh != null:
+		_visual.mesh = hero_mi.mesh
+		_visual.scale = Vector3.ONE * VISUAL_BASE_SCALE
+	inst.queue_free()
+
+
+func _find_first_mesh(n: Node) -> MeshInstance3D:
+	if n is MeshInstance3D:
+		return n as MeshInstance3D
+	for c in n.get_children():
+		var found := _find_first_mesh(c)
+		if found != null:
+			return found
+	return null
+
+
+## P23: the player's persisted skin choice (GameState), default 0.
+func _selected_skin() -> int:
+	var gs := _gs()
+	if gs != null and "selected_skin" in gs:
+		return int(gs.selected_skin)
+	return 0
+
+
+## P23: re-apply the skin live (character select on the start screen).
+func apply_selected_skin() -> void:
+	GeckoSkins.apply_skin(_visual, _selected_skin())
 
 
 ## Touch controls for the phone playtest builds — Subway Surfers grammar:
@@ -494,7 +539,7 @@ func _respawn() -> void:
 	_last_dist = 0 ## P15: distance re-accumulates from the respawn point.
 	_reset_upright_basis()
 	scale = Vector3.ONE
-	_visual.scale = Vector3.ONE ## P22: clear any squash/stretch.
+	_visual.scale = Vector3.ONE * VISUAL_BASE_SCALE ## P22: clear squash/stretch.
 	if _squash_tween != null and _squash_tween.is_valid():
 		_squash_tween.kill()
 	state = MoveState.RUN
@@ -538,12 +583,15 @@ func _update_jump_timers(delta: float) -> void:
 ## P22: squash & stretch, visual-only. Snaps the visual to (width, height),
 ## then a BACK-eased tween settles it to normal over 0.22 s — the classic
 ## cartoon "boing" without touching the hitbox.
+## P23: the hero is rotated 90° about Y, so local Y is up and local Z is
+## lateral: height squashes local Y, width widens local Z. The base scale
+## (0.85) is preserved through the juice.
 func _juice_scale(width: float, height: float) -> void:
 	if _squash_tween != null and _squash_tween.is_valid():
 		_squash_tween.kill()
-	_visual.scale = Vector3(width, 1.0, height)
+	_visual.scale = Vector3(1.0, height, width) * VISUAL_BASE_SCALE
 	_squash_tween = create_tween()
-	_squash_tween.tween_property(_visual, "scale", Vector3.ONE, 0.22)\
+	_squash_tween.tween_property(_visual, "scale", Vector3.ONE * VISUAL_BASE_SCALE, 0.22)\
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 

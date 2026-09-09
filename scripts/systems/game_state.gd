@@ -56,6 +56,8 @@ var max_lives: int = 3 ## P14: deaths per run before game over.
 
 var best_score: int = 0 ## P14: best score, persisted. P22: was mislabeled "distance".
 
+var selected_skin: int = 0 ## P23: hero skin index, persisted.
+
 var run_time: float = 0.0
 
 
@@ -127,12 +129,20 @@ func _load_best() -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load("user://gecko_run.cfg") == OK:
 		best_score = int(cfg.get_value("records", "best_score", 0))
+		selected_skin = clampi(int(cfg.get_value("records", "selected_skin", 0)), 0, 4) ## P23.
 
 
 func _save_best() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("records", "best_score", best_score)
+	cfg.set_value("records", "selected_skin", selected_skin) ## P23.
 	cfg.save("user://gecko_run.cfg")
+
+
+## P23: pick a hero skin; persists immediately so the choice survives.
+func set_skin(index: int) -> void:
+	selected_skin = clampi(index, 0, 4)
+	_save_best()
 
 
 func start_run() -> void:
