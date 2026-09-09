@@ -52,7 +52,7 @@ func _build() -> void:
 	# Reverse lights: two small red boxes on the rear (+X face). They flash
 	# during TELEGRAPH and stay lit while backing up.
 	_light_mat = StandardMaterial3D.new()
-	_light_mat.albedo_color = Color(0.5, 0.05, 0.05, 1.0)
+	_light_mat.albedo_color = Color(0.75, 0.08, 0.08, 1.0) ## P28.5+: hot red.
 	_light_mat.emission_enabled = true
 	_light_mat.emission = Color(1.0, 0.1, 0.1, 1.0)
 	_light_mat.emission_energy_multiplier = 0.2
@@ -106,7 +106,7 @@ func _tick_phase(_delta: float) -> void:
 	if phase == Phase.TELEGRAPH:
 		# Beep-beep: lights flash, body shudders.
 		var flash: float = 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.02)
-		_light_mat.emission_energy_multiplier = lerpf(0.2, 3.0, flash)
+		_light_mat.emission_energy_multiplier = lerpf(0.2, 4.0, flash) ## P28.5+: hot flash.
 		_body.position.x = 0.05 * sin(Time.get_ticks_msec() * 0.05)
 	elif phase == Phase.ACTIVE:
 		var t: float = 1.0 - (_phase_timer / active_time)

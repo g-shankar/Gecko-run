@@ -124,6 +124,7 @@ var _dash_requested: bool = false ## P8: set by the mobile dash button.
 ## gecko's up and local Z is lateral.
 @onready var _visual: MeshInstance3D = $MeshInstance3D
 var _squash_tween: Tween ## P22: the active scale-recovery tween, if any.
+var _animator: GeckoAnimator ## P28.5: procedural run cycle (no rig).
 
 ## P23: the Tripo hero gecko (decimated to ~9.6k verts). Only the mesh is
 ## swapped — the CharacterBody3D, collision capsule and this script stay.
@@ -140,9 +141,13 @@ func _ready() -> void:
 	_spawn_pos = global_position
 	_last_dist = 0
 	_swap_hero_mesh() ## P23: capsule visual -> Tripo gecko (fallback: capsule).
+	_animator = GeckoAnimator.new() ## P28.5: procedural run cycle, no rig.
+	_animator.setup(self, _visual)
+	add_child(_animator)
 	GeckoSkins.apply_skin(_visual, _selected_skin()) ## P23: persisted choice.
 	_build_shield_bubble()
 	_build_speed_trail() ## P19.
+	_build_rim_light() ## P28.5+: subtle rim so the hero reads first.
 	# The feeler rays must ignore the gecko's own body, and their length
 	# follows the exported tuning (the .tscn value is only a default).
 	for ray: RayCast3D in [_wall_ray_l, _wall_ray_r]:
@@ -293,6 +298,8 @@ func _physics_process(delta: float) -> void:
 		stat_state = "DASH"
 		_dash_timer = dash_duration
 		_dash_cooldown = dash_cooldown_time
+		FX.burst(get_parent(), global_position + Vector3(0, 0.4, 0.6),
+			Color(1.0, 0.9, 0.6), 12) ## P28.5+: dash kick-up behind the gecko.
 	if state == MoveState.RUN or state == MoveState.AIR:
 		_check_wall_adhesion()
 	_update_jump_timers(delta)
@@ -311,6 +318,8 @@ func _physics_process(delta: float) -> void:
 	# (Takeoff sets AIR but leaves the floor the same frame, so no false hit.)
 	if was_air and is_on_floor() and state != MoveState.DEAD:
 		_juice_scale(1.25, 0.65)
+		FX.burst(get_parent(), global_position + Vector3(0, 0.12, 0),
+			Color(0.72, 0.65, 0.52), 10) ## P28.5+: landing dust puff.
 	# Track jump peak for the dev HUD: highest point above jump start.
 	if stat_jumps > 0 and not is_on_floor():
 		stat_last_peak = maxf(stat_last_peak, global_position.y - _jump_start_y)
@@ -516,6 +525,9 @@ func give_shield() -> void:
 func give_speed_boost() -> void:
 	_speed_boost_timer = SPEED_BOOST_DURATION
 	_speed_trail.visible = true
+	var atmo := get_tree().get_first_node_in_group("atmosphere")
+	if atmo != null and atmo.has_method("kick_speed_lines"):
+		atmo.kick_speed_lines() ## P28.5+: brief radial speed-line flash.
 
 
 ## P27: grant camouflage (5 s). While active, hazards can't see the gecko:
@@ -599,15 +611,30 @@ func _build_speed_trail() -> void:
 	add_child(_speed_trail)
 
 
+## P28.5+: subtle rim/fill so the hero reads FIRST against the lush
+## dressing (visual hierarchy from the key art). A cheap back-facing
+## OmniLight3D, no shadows: parked ahead of the gecko in body space, so from
+## the chase camera it rims the gecko's top/back edges. Visual only.
+func _build_rim_light() -> void:
+	var rim := OmniLight3D.new()
+	rim.name = "RimLight"
+	rim.light_color = Color(0.88, 0.94, 1.0)
+	rim.light_energy = 0.55
+	rim.omni_range = 5.0
+	rim.shadow_enabled = false
+	rim.position = Vector3(0, 0.9, -1.4) # Ahead = behind it on screen.
+	add_child(rim)
+
+
 ## P12: the translucent bubble that says "you're protected."
 func _build_shield_bubble() -> void:
 	_shield_bubble = MeshInstance3D.new()
 	var bubble_mesh := SphereMesh.new()
-	bubble_mesh.radius = 0.65
-	bubble_mesh.height = 1.3
+	bubble_mesh.radius = 0.55 ## P28.5: smaller for the macro camera.
+	bubble_mesh.height = 1.1
 	_shield_bubble.mesh = bubble_mesh
 	var bubble_mat := StandardMaterial3D.new()
-	bubble_mat.albedo_color = Color(0.3, 0.9, 1.0, 0.25)
+	bubble_mat.albedo_color = Color(0.3, 0.9, 1.0, 0.18)
 	bubble_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	bubble_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_shield_bubble.material_override = bubble_mat
@@ -625,9 +652,12 @@ func _respawn() -> void:
 	_last_dist = 0 ## P15: distance re-accumulates from the respawn point.
 	_reset_upright_basis()
 	scale = Vector3.ONE
-	_visual.scale = Vector3.ONE * VISUAL_BASE_SCALE ## P22: clear squash/stretch.
-	if _squash_tween != null and _squash_tween.is_valid():
-		_squash_tween.kill()
+	if _animator != null:
+		_animator.reset() ## P28.5: clears squash/stretch synchronously.
+	else:
+		_visual.scale = Vector3.ONE * VISUAL_BASE_SCALE ## P22: clear squash/stretch.
+		if _squash_tween != null and _squash_tween.is_valid():
+			_squash_tween.kill()
 	state = MoveState.RUN
 	stat_state = "RUN"
 	_adhere_cooldown = 0.0
@@ -677,6 +707,9 @@ func _update_jump_timers(delta: float) -> void:
 ## lateral: height squashes local Y, width widens local Z. The base scale
 ## (0.85) is preserved through the juice.
 func _juice_scale(width: float, height: float) -> void:
+	if _animator != null:
+		_animator.juice(width, height) ## P28.5: composed with dash stretch.
+		return
 	if _squash_tween != null and _squash_tween.is_valid():
 		_squash_tween.kill()
 	_visual.scale = Vector3(1.0, height, width) * VISUAL_BASE_SCALE

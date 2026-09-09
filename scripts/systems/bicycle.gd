@@ -50,19 +50,34 @@ func _build() -> void:
 		_visual.add_child(model)
 	_face_travel_direction()
 	# Lane telegraph: yellow strip across the track. A sibling so it stays
-	# at the crossing while the bike itself moves.
+	# at the crossing while the bike itself moves. P28.5+: spans just the
+	# crossing (|x| <= 6), centered on the track — the old bike-centered
+	# 14 m strip read as a giant beam from the low macro camera.
 	_lane = MeshInstance3D.new()
 	var lane_mesh := PlaneMesh.new()
-	lane_mesh.size = Vector2(cross_distance + 2.0, 1.6)
+	lane_mesh.size = Vector2(cross_distance, 0.8) ## P28.5+: thin warning line.
 	_lane.mesh = lane_mesh
 	_lane_mat = StandardMaterial3D.new()
 	_lane_mat.albedo_color = Color(1.0, 0.85, 0.1, 0.0)
+	_lane_mat.albedo_texture = _make_telegraph_gradient() ## P28.5+: soft ends.
 	_lane_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_lane_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_lane.material_override = _lane_mat
 	add_sibling(_lane)
-	_lane.global_position = global_position + Vector3(0, 0.03, 0)
+	_lane.global_position = Vector3(_start_x, 0.03, global_position.z)
 	_lane.visible = false
+
+
+## P28.5+: the lane telegraph fades at its far ends (alpha ramp along X),
+## so from the low macro camera it reads as a warning band, not a beam.
+func _make_telegraph_gradient() -> ImageTexture:
+	var img := Image.create(64, 8, true, Image.FORMAT_RGBA8)
+	for y in 8:
+		for x in 64:
+			var u := absf(float(x) / 63.0 - 0.5) * 2.0 # 0 center, 1 ends.
+			var a := clampf(1.0 - (u - 0.45) / 0.55, 0.0, 1.0)
+			img.set_pixel(x, y, Color(1, 1, 1, a))
+	return ImageTexture.create_from_image(img)
 
 
 ## P25: the Tripo bike model faces -Z natively; rotate the wrapper so it
@@ -131,7 +146,7 @@ func _on_recover() -> void:
 func _tick_phase(_delta: float) -> void:
 	if phase == Phase.TELEGRAPH:
 		var t: float = 1.0 - (_phase_timer / warn_time)
-		_lane_mat.albedo_color.a = lerpf(0.0, 0.5, t)
+		_lane_mat.albedo_color.a = 0.5
 		# Bell: creep into view before the crossing.
 		position.x = lerpf(
 			_start_x - _direction * (cross_distance * 0.5 + 1.0),

@@ -51,9 +51,13 @@ func _run() -> void:
 	_check("dash hits ~12 m/s", dash_speed > 10.0)
 	print("  dash speed: %.1f m/s" % dash_speed)
 	# FOV kick: let the camera ease, then read it mid-dash.
+	# P28.5: macro base FOV is 50 (was 70) — assert relative to the rig's
+	# base_fov so the kick itself is what's verified, not the old number.
+	var _rig: Node = scene.get_node("CameraRig")
+	var _base_fov: float = float(_rig.get("base_fov"))
 	for i in range(6):
 		await process_frame
-	_check("FOV kicks up (fov > 75)", _camera.fov > 75.0)
+	_check("FOV kicks up (fov > base+5)", _camera.fov > _base_fov + 5.0)
 	print("  fov mid-dash: %.1f" % _camera.fov)
 	# Let the dash end; spam should be blocked by the cooldown.
 	for i in range(30):
@@ -63,10 +67,10 @@ func _run() -> void:
 	Input.action_release("dash")
 	await physics_frame
 	_check("cooldown blocks immediate re-dash (state != DASH)", _gecko.get("state") != 4)
-	# FOV should relax back toward 70 after the dash.
+	# FOV should relax back toward base_fov after the dash.
 	for i in range(60):
 		await process_frame
-	_check("FOV relaxes after dash (fov < 73)", _camera.fov < 73.0)
+	_check("FOV relaxes after dash (fov < base+5)", _camera.fov < _base_fov + 5.0)
 	print("  fov after: %.1f" % _camera.fov)
 	_finish()
 

@@ -145,11 +145,11 @@ func _tick_phase(delta: float) -> void:
 			_sweep_phase += delta * sweep_speed * TAU
 			var ang: float = sin(_sweep_phase) * deg_to_rad(sweep_degrees * 0.5)
 			_fan.rotation.y = ang
-			_fan_mat.albedo_color.a = 0.45
+			_fan_mat.albedo_color.a = 0.55 ## P28.5+: water reads on rich grass.
 		Phase.RECOVERY:
 			var t: float = 1.0 - (_phase_timer / recovery_time)
 			# Pressure drops: fan fades, head retracts.
-			_fan_mat.albedo_color.a = lerpf(0.45, 0.0, t)
+			_fan_mat.albedo_color.a = lerpf(0.55, 0.0, t)
 			_head.position.y = lerpf(pop_height, 0.05, t)
 			if t >= 1.0:
 				_fan.visible = false

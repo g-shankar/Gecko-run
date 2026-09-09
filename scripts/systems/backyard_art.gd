@@ -8,10 +8,17 @@ class_name BackyardArt
 ## assets, no import-pipeline risk). Collision shapes, spawn positions, and
 ## gameplay scripts are never touched.
 
-const GRASS_SIZE := 384
+const GRASS_SIZE := 512
 const WOOD_SIZE := 256
 const SOIL_SIZE := 128
 const LEAF_SIZE := 128
+
+## P28.5+ (art-direction fold-in): route-edge dressing counts. Every inch
+## dressed, one draw call per system, all capped for the 60fps mobile budget.
+const SHRUB_COUNT := 120      ## Layered plants, multiple heights.
+const FLOWER_COUNT := 60      ## Bright blossom pops.
+const FALLEN_LEAF_COUNT := 80 ## Autumn-floor litter.
+const MULCH_COUNT := 40       ## Dark soil patches.
 
 var _rng := RandomNumberGenerator.new()
 
@@ -21,9 +28,26 @@ func _ready() -> void:
 	_setup_environment()
 	_setup_sun()
 	_paint_ground()
+	_paint_dirt_path() ## P28.5: worn track down the run line.
+	_scatter_ground_detail() ## P28.5: clover + pebbles, instanced.
+	_dress_route_edges() ## P28.5+: lush layered edging — no empty flats.
 	_paint_fence()
 	_paint_planters()
 	paint_pergola()
+
+
+## P28.5+: keep the short dirt segment under the gecko. It only spans
+## 80 m, so it must travel with the run; the 4 m texture tiles hide the
+## motion (the pattern repeats, only the segment origin moves).
+func _process(_delta: float) -> void:
+	if _dirt_path == null or not is_instance_valid(_dirt_path):
+		return
+	if _gecko_ref == null or not is_instance_valid(_gecko_ref):
+		_gecko_ref = get_parent().get_node_or_null("Gecko") as Node3D
+		if _gecko_ref == null:
+			return
+	_dirt_path.position.z = _gecko_ref.position.z - 20.0
+	_dirt_path.position.x = 0.0
 
 
 ## Blue Florida sky, warm haze at the horizon, sky-sourced ambient light,
@@ -64,16 +88,243 @@ func _setup_sun() -> void:
 	sun.shadow_enabled = true
 
 
-## The lawn: mottled procedural grass tiled every ~2 m.
+## P28.5: the lawn, rebuilt. One 512px tile covers 8x8 m (uv1_scale 15/70
+## over the 120x560 plane), so BOTH scales live in one texture: large patch
+## mottling (1-3 m color variation that kills the "green mat" feel) plus
+## fine blade detail, with a generated normal map for close-up relief.
 func _paint_ground() -> void:
 	var ground := get_parent().get_node_or_null("Ground") as MeshInstance3D
 	if ground == null:
 		return
 	var mat := StandardMaterial3D.new()
 	mat.albedo_texture = _make_grass_texture()
+	mat.normal_texture = _make_grass_normal()
 	mat.roughness = 0.95
-	mat.uv1_scale = Vector3(60, 280, 1)
+	mat.uv1_scale = Vector3(15, 70, 1) # 8 m tiles across the 120x560 lawn.
 	ground.material_override = mat
+
+
+## P28.5: a worn dirt path down the run line — the gecko's lane reads as
+## traveled ground, not a texture seam. A separate thin plane (y=0.025,
+## no z-fight at these distances) with a feathered-edge dirt texture.
+## P28.5+: the path is a SHORT segment (80 m) that follows the gecko.
+## A 560 m transparent quad breaks depth sorting in GL Compatibility
+## (it rendered as a huge amber wedge); a short segment stays sorted.
+var _dirt_path: MeshInstance3D
+var _gecko_ref: Node3D
+
+func _paint_dirt_path() -> void:
+	var path := MeshInstance3D.new()
+	path.name = "DirtPath"
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(3.4, 80.0)
+	path.mesh = pm
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = _make_dirt_texture()
+	mat.roughness = 1.0
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.uv1_scale = Vector3(1, 20, 1) # 4 m tiles down the 80 m segment.
+	path.material_override = mat
+	path.position = Vector3(0, 0.025, -20)
+	path.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Deferred: BackyardArt._ready runs while Main is still setting up
+	# children, so direct add_child() fails (same as Atmosphere's tufts).
+	get_parent().call_deferred("add_child", path)
+	_dirt_path = path
+
+
+## P28.5: scattered clover tufts + pebbles along the track edges. Two
+## MultiMeshes (one draw call each), capped counts, one shared material
+## each, per-instance tint variation. Shadows off — they're centimeters.
+func _scatter_ground_detail() -> void:
+	_rng.seed = 20260909
+	var parent := get_parent()
+	# Clover: alpha-cutout quads with a painted 3-leaf cluster texture.
+	var clover_tex := _make_clover_texture()
+	var clover_mat := StandardMaterial3D.new()
+	clover_mat.albedo_texture = clover_tex
+	clover_mat.roughness = 1.0
+	clover_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+	clover_mat.alpha_scissor_threshold = 0.5
+	clover_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.16, 0.13)
+	quad.material = clover_mat
+	var clover_mm := MultiMesh.new()
+	clover_mm.transform_format = MultiMesh.TRANSFORM_3D
+	clover_mm.use_colors = true
+	clover_mm.mesh = quad
+	clover_mm.instance_count = 150
+	for i in 150:
+		var x := _rng.randf_range(-8.0, 8.0)
+		if absf(x) < 1.9:
+			x = signf(x if x != 0.0 else 1.0) * _rng.randf_range(1.9, 8.0)
+		var s := _rng.randf_range(0.7, 1.4)
+		var t := Transform3D(
+			Basis(Vector3.UP, _rng.randf() * TAU).scaled(Vector3(s, s, s)),
+			Vector3(x, 0.02, _rng.randf_range(-488.0, 60.0)))
+		clover_mm.set_instance_transform(i, t)
+		var tint := _rng.randf_range(0.75, 1.1)
+		clover_mm.set_instance_color(i, Color(0.5 * tint, 0.85 * tint, 0.35 * tint))
+	var clover := MultiMeshInstance3D.new()
+	clover.name = "CloverScatter"
+	clover.multimesh = clover_mm
+	clover.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.call_deferred("add_child", clover)
+	# Pebbles: tiny flattened boxes, tinted per instance.
+	var peb_mat := StandardMaterial3D.new()
+	peb_mat.albedo_color = Color(0.55, 0.5, 0.42)
+	peb_mat.roughness = 1.0
+	var peb := BoxMesh.new()
+	peb.size = Vector3(0.07, 0.035, 0.055)
+	peb.material = peb_mat
+	var peb_mm := MultiMesh.new()
+	peb_mm.transform_format = MultiMesh.TRANSFORM_3D
+	peb_mm.use_colors = true
+	peb_mm.mesh = peb
+	peb_mm.instance_count = 90
+	for i in 90:
+		var s := _rng.randf_range(0.6, 1.6)
+		var t := Transform3D(
+			Basis(Vector3.UP, _rng.randf() * TAU).scaled(Vector3(s, s, s)),
+			Vector3(_rng.randf_range(-8.0, 8.0), 0.015,
+				_rng.randf_range(-488.0, 60.0)))
+		peb_mm.set_instance_transform(i, t)
+		var g := _rng.randf_range(0.35, 0.7)
+		peb_mm.set_instance_color(i, Color(g, g * 0.94, g * 0.82))
+	var pebbles := MultiMeshInstance3D.new()
+	pebbles.name = "PebbleScatter"
+	pebbles.multimesh = peb_mm
+	pebbles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.call_deferred("add_child", pebbles)
+
+
+## P28.5+ (art-direction fold-in): the reference is LUSH — every inch dressed.
+## Four more instanced systems along the route edges, one draw call each:
+## layered shrubs at multiple heights, bright flowers, fallen leaves, mulch.
+## Reuses the leaf/soil materials; per-instance tint for variety. Shadows off.
+func _dress_route_edges() -> void:
+	_rng.seed = 20260910
+	var parent := get_parent()
+	# Shrubs: single quads with the leaf-cluster texture, random yaw, heights
+	# 0.4-1.7 m — a ragged layered wall of green both sides of the track.
+	var leaf_mat := StandardMaterial3D.new()
+	leaf_mat.albedo_texture = _make_leaf_texture()
+	leaf_mat.roughness = 0.9
+	leaf_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+	leaf_mat.alpha_scissor_threshold = 0.5
+	leaf_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var shrub_quad := QuadMesh.new()
+	shrub_quad.size = Vector2(0.8, 0.9)
+	shrub_quad.material = leaf_mat
+	var shrub_mm := MultiMesh.new()
+	shrub_mm.transform_format = MultiMesh.TRANSFORM_3D
+	shrub_mm.use_colors = true
+	shrub_mm.mesh = shrub_quad
+	shrub_mm.instance_count = SHRUB_COUNT
+	for i in SHRUB_COUNT:
+		var side := 1.0 if i % 2 == 0 else -1.0
+		var s := _rng.randf_range(0.8, 1.9)
+		var t := Transform3D(
+			Basis(Vector3.UP, _rng.randf() * TAU).scaled(Vector3(s, s, s)),
+			Vector3(side * _rng.randf_range(3.0, 9.0), 0.45 * s,
+				_rng.randf_range(-488.0, 60.0)))
+		shrub_mm.set_instance_transform(i, t)
+		var tint := _rng.randf_range(0.7, 1.15)
+		shrub_mm.set_instance_color(i,
+			Color(0.45 * tint, 0.8 * tint, 0.3 * tint))
+	var shrubs := MultiMeshInstance3D.new()
+	shrubs.name = "RouteEdgeShrubs"
+	shrubs.multimesh = shrub_mm
+	shrubs.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.call_deferred("add_child", shrubs)
+	# Flowers: small blossom quads, per-instance petal color.
+	var flower_mat := StandardMaterial3D.new()
+	flower_mat.albedo_texture = _make_flower_texture()
+	flower_mat.roughness = 0.8
+	flower_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+	flower_mat.alpha_scissor_threshold = 0.5
+	flower_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var flower_quad := QuadMesh.new()
+	flower_quad.size = Vector2(0.2, 0.24)
+	flower_quad.material = flower_mat
+	var flower_mm := MultiMesh.new()
+	flower_mm.transform_format = MultiMesh.TRANSFORM_3D
+	flower_mm.use_colors = true
+	flower_mm.mesh = flower_quad
+	flower_mm.instance_count = FLOWER_COUNT
+	var palette := [Color(1.0, 0.3, 0.25), Color(1.0, 0.85, 0.25),
+		Color(1.0, 0.55, 0.75), Color(1.0, 1.0, 1.0)]
+	for i in FLOWER_COUNT:
+		var side := 1.0 if i % 2 == 0 else -1.0
+		var s := _rng.randf_range(0.7, 1.3)
+		var t := Transform3D(
+			Basis(Vector3.UP, _rng.randf() * TAU).scaled(Vector3(s, s, s)),
+			Vector3(side * _rng.randf_range(2.0, 7.0), 0.12 * s,
+				_rng.randf_range(-488.0, 60.0)))
+		flower_mm.set_instance_transform(i, t)
+		flower_mm.set_instance_color(i, palette[i % palette.size()])
+	var flowers := MultiMeshInstance3D.new()
+	flowers.name = "RouteEdgeFlowers"
+	flowers.multimesh = flower_mm
+	flowers.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.call_deferred("add_child", flowers)
+	# Fallen leaves: flat quads on the lawn, autumn browns/oranges.
+	var leaf_lit_mat := StandardMaterial3D.new()
+	leaf_lit_mat.albedo_texture = _make_clover_texture()
+	leaf_lit_mat.roughness = 1.0
+	leaf_lit_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+	leaf_lit_mat.alpha_scissor_threshold = 0.5
+	leaf_lit_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var flat_quad := QuadMesh.new()
+	flat_quad.size = Vector2(0.14, 0.14)
+	flat_quad.material = leaf_lit_mat
+	var flat_mm := MultiMesh.new()
+	flat_mm.transform_format = MultiMesh.TRANSFORM_3D
+	flat_mm.use_colors = true
+	flat_mm.mesh = flat_quad
+	flat_mm.instance_count = FALLEN_LEAF_COUNT
+	for i in FALLEN_LEAF_COUNT:
+		var flat := Basis(Vector3.UP, _rng.randf() * TAU) \
+			* Basis(Vector3.RIGHT, -PI / 2.0)
+		var s := _rng.randf_range(0.7, 1.6)
+		var t := Transform3D(flat.scaled(Vector3(s, s, s)),
+			Vector3(_rng.randf_range(-9.0, 9.0), 0.03,
+				_rng.randf_range(-488.0, 60.0)))
+		flat_mm.set_instance_transform(i, t)
+		flat_mm.set_instance_color(i, Color(
+			_rng.randf_range(0.5, 0.72), _rng.randf_range(0.28, 0.45),
+			_rng.randf_range(0.12, 0.25)))
+	var litter := MultiMeshInstance3D.new()
+	litter.name = "FallenLeaves"
+	litter.multimesh = flat_mm
+	litter.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.call_deferred("add_child", litter)
+	# Mulch: dark soil patches breaking the lawn's green.
+	var mulch_mat := StandardMaterial3D.new()
+	mulch_mat.albedo_texture = _make_soil_texture()
+	mulch_mat.roughness = 1.0
+	var mulch_quad := QuadMesh.new()
+	mulch_quad.size = Vector2(0.55, 0.55)
+	mulch_quad.material = mulch_mat
+	var mulch_mm := MultiMesh.new()
+	mulch_mm.transform_format = MultiMesh.TRANSFORM_3D
+	mulch_mm.mesh = mulch_quad
+	mulch_mm.instance_count = MULCH_COUNT
+	for i in MULCH_COUNT:
+		var flat := Basis(Vector3.UP, _rng.randf() * TAU) \
+			* Basis(Vector3.RIGHT, -PI / 2.0)
+		var s := _rng.randf_range(0.8, 2.2)
+		var side := 1.0 if i % 2 == 0 else -1.0
+		var t := Transform3D(flat.scaled(Vector3(s, s, s)),
+			Vector3(side * _rng.randf_range(2.5, 8.0), 0.02,
+				_rng.randf_range(-488.0, 60.0)))
+		mulch_mm.set_instance_transform(i, t)
+	var mulch := MultiMeshInstance3D.new()
+	mulch.name = "MulchPatches"
+	mulch.multimesh = mulch_mm
+	mulch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.call_deferred("add_child", mulch)
 
 
 ## P25: the finish-gate fence becomes REAL fence sections — two weathered
@@ -243,37 +494,157 @@ func paint_pergola() -> void:
 
 # ---------------------------------------------------------------- textures
 
+## P28.5: one tile = 8x8 m of lawn. Three scales baked in: broad patch
+## mottling (1-3 m, kills the flat "mat"), clump variation (~25 cm), and
+## short blade strokes + grain for gecko-height close-ups.
 func _make_grass_texture() -> ImageTexture:
-	var n := GRASS_SIZE
-	var gw := 48
-	var grid := PackedFloat32Array()
-	grid.resize(gw * gw)
-	for gy in gw:
-		for gx in gw:
-			grid[gy * gw + gx] = _pvnoise(gx * 8.0 / gw, gy * 8.0 / gw, 11, 8, 8)
+	var n := GRASS_SIZE # 512; one tile = 8x8 m.
+	# Coarse value-noise grids, sampled per pixel (cheap): broad 1-3 m
+	# patch mottling + medium clumps. Fine grain stays per-pixel hash.
+	var broad := PackedFloat32Array()
+	broad.resize(4 * 4)
+	var mid := PackedFloat32Array()
+	mid.resize(8 * 8)
+	for gy in 4:
+		for gx in 4:
+			broad[gy * 4 + gx] = _pvnoise(gx * 1.0, gy * 1.0, 11, 4, 4)
+	for gy in 8:
+		for gx in 8:
+			mid[gy * 8 + gx] = _pvnoise(gx * 1.0 + 13.0, gy * 1.0, 23, 8, 8)
 	var img := Image.create(n, n, false, Image.FORMAT_RGB8)
 	for y in n:
 		for x in n:
-			var fx := float(x) / n * gw
-			var fy := float(y) / n * gw
-			var mottle := _sample_grid(grid, gw, fx, fy)
-			var clump := _hash(x / 3, y / 3, 91)
+			var u := float(x) / n
+			var v := float(y) / n
+			var patch := _sample_grid(broad, 4, u * 4.0, v * 4.0)
+			var patch2 := _sample_grid(mid, 8, u * 8.0, v * 8.0)
+			var clump := _hash(x / 8, y / 8, 91) # ~12 cm clumps.
 			var grain := _hash(x, y, 37)
-			var g := 0.40 + (mottle - 0.5) * 0.20 + (clump - 0.5) * 0.10 + (grain - 0.5) * 0.08
-			var r := 0.22 + (mottle - 0.5) * 0.14 + (clump - 0.5) * 0.08 + (grain - 0.5) * 0.06
-			var b := 0.14 + (mottle - 0.5) * 0.07 + (grain - 0.5) * 0.05
+			var tone := (patch - 0.5) * 0.44 + (patch2 - 0.5) * 0.22 \
+				+ (clump - 0.5) * 0.12 + (grain - 0.5) * 0.08
+			# Yellow-green dry patches vs deep green lush patches.
+			# P28.5+: deepened slightly so the worn dirt path reads clearly.
+			var r := (0.26 + tone * 0.55) * 0.94
+			var g := (0.44 + tone * 0.42) * 0.94
+			var b := (0.15 + tone * 0.18) * 0.94
 			img.set_pixel(x, y, Color(r, g, b))
 	# Short blade strokes for a lawn feel at gecko height.
-	for i in 700:
+	for i in 2600:
 		var x := _rng.randi_range(0, n - 1)
 		var y := _rng.randi_range(0, n - 1)
 		var dark := _rng.randf() < 0.6
-		for k in _rng.randi_range(2, 5):
+		for k in _rng.randi_range(2, 6):
 			var yy := y + k
 			if yy >= n:
 				break
 			var c := img.get_pixel(x, yy)
-			img.set_pixel(x, yy, c * (0.82 if dark else 1.12))
+			img.set_pixel(x, yy, c * (0.80 if dark else 1.14))
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
+
+
+## P28.5: normal map from noise — gives the lawn close-up relief under the
+## low warm sun. Generated from a grayscale height field via Godot's
+## bump-to-normal conversion (no shipped textures).
+func _make_grass_normal() -> ImageTexture:
+	var n := 256
+	var img := Image.create(n, n, false, Image.FORMAT_R8)
+	for y in n:
+		for x in n:
+			var u := float(x) / n
+			var v := float(y) / n
+			var h := _pvnoise(u * 24.0, v * 24.0, 41, 24, 24) * 0.6 \
+				+ _pvnoise(u * 64.0, v * 64.0, 97, 64, 64) * 0.4
+			var g8 := int(clampf(h, 0.0, 1.0) * 255.0)
+			img.set_pixel(x, y, Color8(g8, g8, g8))
+	img.bump_map_to_normal_map(2.0)
+	return ImageTexture.create_from_image(img)
+
+
+## P28.5: worn dirt — tan/brown noise with pebble speckles; horizontal
+## alpha feather so the path melts into the lawn at its edges.
+func _make_dirt_texture() -> ImageTexture:
+	var n := 256
+	var img := Image.create(n, n, true, Image.FORMAT_RGBA8)
+	for y in n:
+		for x in n:
+			var edge := absf(float(x) / n - 0.5) * 2.0 # 0 center, 1 edge.
+			var alpha := clampf(1.0 - (edge - 0.55) / 0.45, 0.0, 1.0)
+			var mottle := _pvnoise(x / 28.0, y / 28.0, 131, 9, 9)
+			var grain := _hash(x, y, 149)
+			var v := 0.8 + (mottle - 0.5) * 0.5 + (grain - 0.5) * 0.35
+			# Center is more worn (lighter, dustier); edges blend to grass.
+			# P28.5+: sun-bleached sandy tone — the track line must read on
+			# the deepened lawn (contrast rule in test_p28_5, >= 0.08).
+			var wear := 1.0 - edge * 0.25
+			img.set_pixel(x, y, Color(0.78 * v * wear, 0.60 * v * wear,
+				0.40 * v * wear, alpha))
+	# Pebble speckles.
+	for i in 260:
+		var x := _rng.randi_range(2, n - 3)
+		var y := _rng.randi_range(2, n - 3)
+		var g := _rng.randf_range(0.35, 0.75)
+		img.set_pixel(x, y, Color(g, g * 0.95, g * 0.85, 1.0))
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
+
+
+## P28.5+: blossom cluster on transparency — white petals that take the
+## per-instance tint (red/yellow/pink/white), yellow heart.
+func _make_flower_texture() -> ImageTexture:
+	var n := 64
+	var img := Image.create(n, n, true, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	for i in 5:
+		var cx := _rng.randf_range(16, n - 16)
+		var cy := _rng.randf_range(16, n - 16)
+		for k in 5:
+			var ang := k * TAU / 5.0 + _rng.randf() * 0.5
+			var px := cx + cos(ang) * 8.0
+			var py := cy + sin(ang) * 8.0
+			for yy in range(int(py) - 6, int(py) + 7):
+				for xx in range(int(px) - 6, int(px) + 7):
+					if xx < 0 or yy < 0 or xx >= n or yy >= n:
+						continue
+					var dx := xx - px
+					var dy := yy - py
+					if dx * dx + dy * dy <= 28.0:
+						img.set_pixel(xx, yy, Color(0.95, 0.95, 0.95))
+		for yy in range(int(cy) - 4, int(cy) + 5):
+			for xx in range(int(cx) - 4, int(cx) + 5):
+				if xx < 0 or yy < 0 or xx >= n or yy >= n:
+					continue
+				var dx := xx - cx
+				var dy := yy - cy
+				if dx * dx + dy * dy <= 14.0:
+					img.set_pixel(xx, yy, Color(1.0, 0.85, 0.3))
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
+
+
+## P28.5: a little 3-leaf clover cluster on transparency, alpha-scissored.
+func _make_clover_texture() -> ImageTexture:
+	var n := 64
+	var img := Image.create(n, n, true, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	for i in 4:
+		var cx := _rng.randf_range(14, n - 14)
+		var cy := _rng.randf_range(14, n - 14)
+		var shade := _rng.randf()
+		var leaf := Color(0.16 + shade * 0.12, 0.42 + shade * 0.18,
+			0.12 + shade * 0.08)
+		for k in 3:
+			var ang := _rng.randf() * TAU + k * TAU / 3.0
+			var lx := cx + cos(ang) * 7.0
+			var ly := cy + sin(ang) * 7.0
+			for yy in range(int(ly) - 6, int(ly) + 7):
+				for xx in range(int(lx) - 6, int(lx) + 7):
+					if xx < 0 or yy < 0 or xx >= n or yy >= n:
+						continue
+					var dx := xx - lx
+					var dy := yy - ly
+					if dx * dx + dy * dy <= 30.0:
+						img.set_pixel(xx, yy, leaf)
 	img.generate_mipmaps()
 	return ImageTexture.create_from_image(img)
 

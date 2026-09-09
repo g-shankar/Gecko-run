@@ -9,16 +9,24 @@ extends Node3D
 ## - Collision avoidance comes from SpringArm3D: it casts a ray along +Z and
 ##   pulls the camera in when a wall is in the way, so the view never clips
 ##   through geometry. (P4 acceptance: "never clips through a test wall.")
-## - FOV kick on dash (70 -> 82) arrives with dash in P8.
+## - FOV kick on dash (base_fov -> base_fov + 12) arrives with dash in P8.
 
 ## --- Tuning (spec §8). All exported: no magic numbers below. ---
 @export var target: Node3D            ## The gecko to follow. Auto-discovered via the
                                  ## "gecko" group when left unset (see _ready).
-@export var follow_height: float = 1.4 ## Camera height above the gecko (m).
-@export var follow_back: float = 2.2  ## Resting distance behind the gecko (m).
+@export var follow_height: float = 0.62 ## P28.5: macro POV — camera drops to
+                                 ## near gecko eye level so the world looms.
+@export var follow_back: float = 2.1  ## P28.5: close enough that the hero
+                                 ## fills the frame like macro photography.
 @export var follow_speed: float = 8.0 ## Higher = tighter/snappier follow.
-@export var look_ahead: float = 2.0   ## Aim point this far ahead of the gecko (m).
-@export var look_height: float = 0.5  ## Aim point height above the gecko (m).
+@export var look_ahead: float = 2.8   ## P28.5: more look-ahead keeps the run
+                                 ## playable on phones with the narrow FOV.
+@export var look_height: float = 0.35 ## P28.5: aim lower, at the gecko's world.
+@export var side_offset: float = 0.65 ## P28.5: lateral offset (m) along the
+                                 ## gecko's right — a 3/4 rear view so the
+                                 ## flank, legs and head read instead of a
+                                 ## foreshortened green blob.
+@export var base_fov: float = 50.0 ## P28.5: narrow "macro lens" FOV (was 70).
 @export var arm_margin: float = 0.25  ## SpringArm safety margin (m).
 @export var bank_speed: float = 6.0 ## How fast the camera rolls when the gecko
                                  ## adheres to a wall (higher = snappier).
@@ -69,12 +77,17 @@ func _process(delta: float) -> void:
 		up_target = (target as CharacterBody3D).up_direction
 	_bank_up = _bank_up.lerp(up_target, 1.0 - exp(-bank_speed * delta)).normalized()
 	# Glide toward the follow point, measured along the (possibly banked) up.
-	var desired: Vector3 = target.global_position + _bank_up * follow_height
+	# P28.5: side_offset shifts the rig along the gecko's own right vector,
+	# so the chase frames a 3/4 rear view (Subway Surfers-style) instead of
+	# dead-behind foreshortening. On walls/ceiling it follows the gecko's
+	# frame, so the bank behavior is preserved.
+	var basis: Basis = target.global_transform.basis
+	var desired: Vector3 = (target.global_position + _bank_up * follow_height
+		+ basis.x * side_offset)
 	var blend: float = 1.0 - exp(-follow_speed * delta)
 	global_position = global_position.lerp(desired, blend)
 	# Aim along the gecko's own frame: forward = -basis.z, up = basis.y. On
 	# the floor that's down-track; on a wall that's up the surface.
-	var basis: Basis = target.global_transform.basis
 	var aim: Vector3 = (target.global_position
 		- basis.z * look_ahead
 		+ basis.y * look_height)
@@ -87,12 +100,13 @@ func _process(delta: float) -> void:
 		_camera.rotation.x += randf_range(-s, s)
 		_camera.rotation.y += randf_range(-s, s)
 		_camera.rotation.z += randf_range(-s, s) * 0.5
-	# P8: FOV kick on dash (70 -> 82). Eased, so it punches in and relaxes out.
-	var fov_target := 70.0
+	# P8: FOV kick on dash. Eased, so it punches in and relaxes out.
+	# P28.5: kicks are relative to the macro base_fov (50).
+	var fov_target := base_fov
 	if target.get("stat_state") == "DASH":
-		fov_target = 82.0
+		fov_target = base_fov + 12.0
 	elif float(target.get("_speed_boost_timer") or 0.0) > 0.0:
-		fov_target = 78.0 ## P19: milder kick for the speed boost.
+		fov_target = base_fov + 8.0 ## P19: milder kick for the speed boost.
 	_camera.fov = lerpf(_camera.fov, fov_target, 1.0 - exp(-10.0 * delta))
 
 

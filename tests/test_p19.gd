@@ -103,7 +103,9 @@ func _initialize() -> void:
 	for i in 90:
 		await process_frame
 	var cam: Camera3D = rig.get_node("Boom/Camera3D")
-	check(cam.fov > 74.0, "camera FOV kicks up on boost (fov=%.1f)" % cam.fov)
+	# P28.5: macro base FOV is 50 (was 70) — assert the kick relative to it.
+	check(cam.fov > float(rig.get("base_fov")) + 4.0,
+		"camera FOV kicks up on boost (fov=%.1f)" % cam.fov)
 
 	# --- 7: HUD indicator ---
 	var speed_label: Label = ui.get("_speed_label")

@@ -39,14 +39,14 @@ func _build() -> void:
 	# The bug: a small emissive sphere (firefly).
 	_mesh = MeshInstance3D.new()
 	var bug_mesh := SphereMesh.new()
-	bug_mesh.radius = 0.18
-	bug_mesh.height = 0.36
+	bug_mesh.radius = 0.11 ## P28.5+: was 0.18 — read as giant eggs, not bugs.
+	bug_mesh.height = 0.22
 	_mesh.mesh = bug_mesh
 	_glow_mat = StandardMaterial3D.new()
 	_glow_mat.albedo_color = Color(1.0, 0.85, 0.2, 1.0) # Golden.
 	_glow_mat.emission_enabled = true
 	_glow_mat.emission = Color(1.0, 0.75, 0.15, 1.0)
-	_glow_mat.emission_energy_multiplier = 2.0
+	_glow_mat.emission_energy_multiplier = 1.4 ## P28.5+: was 2.0, still pops.
 	_mesh.material_override = _glow_mat
 	add_child(_mesh)
 	# Wings: two tiny translucent planes.
@@ -97,5 +97,6 @@ func _collect(burst_color: Color) -> void:
 	var gs := get_tree().root.get_node_or_null("GameState")
 	if gs != null and gs.has_method("collect_bug"):
 		gs.collect_bug()
-	FX.burst(get_tree().root, global_position, burst_color)
+	FX.burst(get_tree().root, global_position, burst_color, 22) ## P28.5+: bigger pop.
+	FX.burst(get_tree().root, global_position, Color(1.0, 0.95, 0.7), 8) ## hot core flash.
 	queue_free()

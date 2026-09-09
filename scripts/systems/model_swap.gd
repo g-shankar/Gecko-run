@@ -75,6 +75,8 @@ static func make_visual(model_name: String, target_longest_m: float) -> Node3D:
 
 ## P25: clamp mirror-like metallic materials to a satin finish (per-instance
 ## surface overrides; the imported GLB is untouched). Used on the car.
+## P28.5: keep the ORM/normal textures — only the property multipliers drop,
+## so the paint keeps its PBR detail instead of going flat.
 static func _tame_metal(n: Node) -> void:
 	if n is MeshInstance3D:
 		var mi := n as MeshInstance3D
@@ -85,10 +87,7 @@ static func _tame_metal(n: Node) -> void:
 				if m != null and m.metallic > 0.25:
 					var d := m.duplicate() as StandardMaterial3D
 					d.metallic = 0.15
-					d.metallic_texture = null # P25: Tripo bakes chrome into
-					                          # the metallic-roughness map.
-					d.roughness_texture = null
-					d.roughness = 0.5
+					d.roughness = 0.55
 					mi.set_surface_override_material(si, d)
 	for c in n.get_children():
 		_tame_metal(c)
