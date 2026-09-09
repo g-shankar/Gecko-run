@@ -84,6 +84,7 @@ var shield_charges: int = 0 ## P12: hits the shield can still absorb.
 var _shield_timer: float = 0.0 ## P12: shield expiry countdown.
 var _shield_bubble: MeshInstance3D ## P12: the visible bubble.
 var _spawn_pos: Vector3 ## P10: where a respawn puts you.
+var _last_dist: int = 0 ## P15: last distance banked into the score.
 var _respawn_timer: float = 0.0 ## P10: countdown while DEAD.
 var _jump_start_y: float = 0.0
 
@@ -107,6 +108,7 @@ var _dash_requested: bool = false ## P8: set by the mobile dash button.
 func _ready() -> void:
 	_ensure_input_actions()
 	_spawn_pos = global_position
+	_last_dist = 0
 	_build_shield_bubble()
 	# The feeler rays must ignore the gecko's own body, and their length
 	# follows the exported tuning (the .tscn value is only a default).
@@ -172,9 +174,13 @@ func _physics_process(delta: float) -> void:
 			shield_charges = 0
 			_shield_bubble.visible = false
 	# P14: score = meters from the start line.
+	# P15: accumulate distance via add_score so near-miss bonuses persist.
 	var gs := _gs()
 	if gs != null:
-		gs.score = maxi(0, int(_spawn_pos.z - global_position.z))
+		var dist := maxi(0, int(_spawn_pos.z - global_position.z))
+		if dist > _last_dist:
+			gs.add_score(dist - _last_dist)
+			_last_dist = dist
 	# P10: while DEAD, just count down to respawn. No movement, no input.
 	if state == MoveState.DEAD:
 		_respawn_timer -= delta
@@ -373,6 +379,7 @@ func _respawn() -> void:
 	global_position = _spawn_pos
 	velocity = Vector3.ZERO
 	up_direction = Vector3.UP
+	_last_dist = 0 ## P15: distance re-accumulates from the respawn point.
 	_reset_upright_basis()
 	scale = Vector3.ONE
 	state = MoveState.RUN

@@ -13,6 +13,7 @@ const HAZARD_SCRIPTS := {
 	"bicycle": "res://scripts/systems/bicycle.gd",
 	"bird": "res://scripts/systems/bird.gd",
 	"car": "res://scripts/systems/car.gd",
+	"sprinkler": "res://scripts/systems/sprinkler.gd",
 }
 
 const HAZARD_NAMES := {
@@ -21,6 +22,7 @@ const HAZARD_NAMES := {
 	"bicycle": "Bicycle",
 	"bird": "Bird",
 	"car": "BackingCar",
+	"sprinkler": "Sprinkler",
 }
 
 @export var level_data: Resource ## A LevelData (level_data.gd). Null = default route.

@@ -8,6 +8,7 @@ signal state_changed(new_state: State)
 signal score_changed(new_score: int)
 signal bugs_changed(new_count: int)
 signal deaths_changed(new_count: int)
+signal near_misses_changed(new_count: int) ## P15: near-miss counter for UI.
 
 var current_state: State = State.READY:
 	set(value):
@@ -30,6 +31,11 @@ var bug_count: int = 0:
 		bug_count = value
 		bugs_changed.emit(bug_count)
 
+var near_miss_count: int = 0: ## P15: survived-it-close counter.
+	set(value):
+		near_miss_count = value
+		near_misses_changed.emit(near_miss_count)
+
 var max_lives: int = 3 ## P14: deaths per run before game over.
 
 var best_score: int = 0 ## P14: best distance, persisted.
@@ -51,6 +57,7 @@ func reset_run() -> void:
 	score = 0
 	deaths = 0
 	bug_count = 0
+	near_miss_count = 0
 	run_time = 0.0
 	current_state = State.READY
 
@@ -97,3 +104,10 @@ func add_score(points: int) -> void:
 func collect_bug() -> void:
 	bug_count += 1
 	add_score(10)
+
+
+## P15: the gecko survived a hazard's ACTIVE phase from close range.
+## Worth 50 points — the "one more run" juice.
+func register_near_miss() -> void:
+	near_miss_count += 1
+	add_score(50)
